@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:secondpeacem/data/dummy_products.dart';
 import 'package:secondpeacem/models/product.dart';
 import 'detail_page.dart';
 
@@ -29,7 +30,7 @@ class HomePage extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: GridView.builder(
                 padding: const EdgeInsets.only(top: 10),
-                itemCount: products.length,
+                itemCount: dummyProducts.length,
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: screenWidth > 600 ? 3 : 2,
                   crossAxisSpacing: 16,
@@ -38,7 +39,7 @@ class HomePage extends StatelessWidget {
                 ),
                 itemBuilder:
                     (context, index) =>
-                        _buildProductItem(context, products[index]),
+                        _buildProductItem(context, dummyProducts[index]),
               ),
             ),
           ),
@@ -105,8 +106,10 @@ class HomePage extends StatelessWidget {
           context,
           PageRouteBuilder(
             pageBuilder:
-                (context, animation, secondaryAnimation) =>
-                    DetailPage(product: product, relatedProducts: products),
+                (context, animation, secondaryAnimation) => DetailPage(
+                  product: product,
+                  relatedProducts: dummyProducts,
+                ),
             transitionsBuilder: (
               context,
               animation,
@@ -133,17 +136,7 @@ class HomePage extends StatelessWidget {
                   ),
                   child: AspectRatio(
                     aspectRatio: 1.1,
-                    child: Image.network(
-                      product.imageUrl != null && product.imageUrl!.isNotEmpty
-                          ? product.imageUrl!
-                          : 'https://via.placeholder.com/150',
-                      fit: BoxFit.cover,
-                      errorBuilder:
-                          (context, error, stackTrace) => Container(
-                            color: Colors.grey[300],
-                            child: const Icon(Icons.broken_image, size: 50),
-                          ),
-                    ),
+                    child: _buildProductImage(product),
                   ),
                 ),
                 Positioned(
@@ -207,5 +200,31 @@ class HomePage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildProductImage(Product product) {
+    final imagePath = product.imageUrl ?? '';
+
+    if (imagePath.startsWith('http')) {
+      return Image.network(
+        imagePath,
+        fit: BoxFit.cover,
+        errorBuilder:
+            (context, error, stackTrace) => Container(
+              color: Colors.grey[300],
+              child: const Icon(Icons.broken_image, size: 50),
+            ),
+      );
+    } else {
+      return Image.asset(
+        imagePath.isNotEmpty ? imagePath : 'assets/placeholder.png',
+        fit: BoxFit.cover,
+        errorBuilder:
+            (context, error, stackTrace) => Container(
+              color: Colors.grey[300],
+              child: const Icon(Icons.broken_image, size: 50),
+            ),
+      );
+    }
   }
 }

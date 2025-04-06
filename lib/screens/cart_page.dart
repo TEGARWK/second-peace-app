@@ -3,6 +3,11 @@ import 'package:provider/provider.dart';
 import 'package:animate_do/animate_do.dart';
 import '../providers/cart_provider.dart';
 import 'checkout_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../models/product.dart';
+
+import '../data/dummy_accounts.dart';
+import '../data/dummy_products.dart'; // ⬅️ Tambahan ini penting
 
 class CartPage extends StatefulWidget {
   const CartPage({super.key});
@@ -15,23 +20,52 @@ class _CartPageState extends State<CartPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final cartProvider = Provider.of<CartProvider>(context, listen: false);
-      if (cartProvider.items.isEmpty) {
-        cartProvider.addItem({
-          'name': 'Baju Pria Hitam',
-          'price': 100000,
-          'quantity': 1,
-          'image': 'assets/baju.jpg',
-          'selected': false,
-        });
-        cartProvider.addItem({
-          'name': 'Sepatu Sneakers',
-          'price': 250000,
-          'quantity': 1,
-          'image': 'assets/sepatu.jpg',
-          'selected': false,
-        });
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getInt('userId');
+
+      if (userId != null) {
+        final user = dummyAccounts.firstWhere(
+          (acc) => acc['id'] == userId,
+          orElse: () => {},
+        );
+
+        if (user.isNotEmpty && user.containsKey('cart')) {
+          final cartProvider = Provider.of<CartProvider>(
+            context,
+            listen: false,
+          );
+
+          final userCart = List<Map<String, dynamic>>.from(user['cart']);
+
+          final detailedCart =
+              userCart.map((cartItem) {
+                final product = dummyProducts.firstWhere(
+                  (prod) => prod.id == cartItem['productId'],
+                  orElse:
+                      () => Product(
+                        id: 0,
+                        name: 'Produk tidak ditemukan',
+                        description: '',
+                        price: 0.0,
+                        stock: 0,
+                        size: '',
+                        imageUrl: 'assets/images/placeholder.png',
+                      ),
+                );
+
+                return {
+                  'productId': cartItem['productId'],
+                  'name': product.name,
+                  'price': product.price,
+                  'image': product.imageUrl ?? 'assets/images/placeholder.png',
+                  'quantity': cartItem['quantity'],
+                  'selected': cartItem['selected'] ?? false,
+                };
+              }).toList();
+
+          cartProvider.setItems(detailedCart);
+        }
       }
     });
   }
@@ -76,7 +110,7 @@ class _CartPageState extends State<CartPage> {
                               return FadeInUp(
                                 duration: const Duration(milliseconds: 300),
                                 child: Dismissible(
-                                  key: Key(item['name']),
+                                  key: Key(item['name'] ?? 'item-$index'),
                                   direction: DismissDirection.endToStart,
                                   onDismissed: (direction) {
                                     cartProvider.removeItem(index);
@@ -105,21 +139,22 @@ class _CartPageState extends State<CartPage> {
                                       leading: ClipRRect(
                                         borderRadius: BorderRadius.circular(10),
                                         child: Image.asset(
-                                          item['image'],
+                                          item['image'] ??
+                                              'assets/images/placeholder.png',
                                           width: 60,
                                           height: 60,
                                           fit: BoxFit.cover,
                                         ),
                                       ),
                                       title: Text(
-                                        item['name'],
+                                        item['name'] ?? 'Produk',
                                         style: const TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                       subtitle: Text(
-                                        'Rp ${item['price']}',
+                                        'Rp ${item['price'] ?? 0}',
                                         style: const TextStyle(
                                           fontSize: 14,
                                           color: Colors.red,
@@ -134,7 +169,7 @@ class _CartPageState extends State<CartPage> {
                                               50,
                                             ),
                                           ),
-                                          value: item['selected'],
+                                          value: item['selected'] ?? false,
                                           activeColor: Colors.green,
                                           onChanged: (value) {
                                             cartProvider.toggleSelect(index);
@@ -215,7 +250,9 @@ class _CartPageState extends State<CartPage> {
             ),
             onPressed: () {
               final selectedItems =
-                  cartProvider.items.where((item) => item['selected']).toList();
+                  cartProvider.items
+                      .where((item) => item['selected'] ?? false)
+                      .toList();
               if (selectedItems.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(

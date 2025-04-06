@@ -12,27 +12,24 @@ class Product {
     required this.name,
     this.description,
     required this.price,
-    required this.stock,
+    this.stock = 0,
     this.size,
     this.imageUrl,
   });
 
-  factory Product.fromJson(Map<String, dynamic> json) {
-    final imageUrl =
-        json['image_url'] != null
-            ? 'http://10.0.2.2:8000/storage/${json['image_url']}'
-            : null;
-
-    print('Membuat Product: ${json['name']} - ImageURL: $imageUrl');
-
+  /// Digunakan untuk dummy data lokal
+  factory Product.fromMap(Map<String, dynamic> map) {
     return Product(
-      id: json['id'],
-      name: json['name'],
-      description: json['description'],
-      price: double.tryParse(json['price'].toString()) ?? 0.0,
-      stock: json['stock'] ?? 0,
-      size: json['size'],
-      imageUrl: imageUrl,
+      id: map['id'],
+      name: map['name'],
+      description: map['description'] ?? '',
+      price:
+          (map['price'] is int)
+              ? (map['price'] as int).toDouble()
+              : map['price'] ?? 0.0,
+      stock: map['stock'] ?? 0,
+      size: map['size'],
+      imageUrl: map['image'], // pakai 'image' dari assets
     );
   }
 

@@ -48,23 +48,37 @@ class _DetailPageState extends State<DetailPage> {
                   bottomLeft: Radius.circular(20),
                   bottomRight: Radius.circular(20),
                 ),
-                child: Image.network(
-                  (imageUrl != null && imageUrl.isNotEmpty)
-                      ? imageUrl
-                      : 'https://via.placeholder.com/300',
-                  width: double.infinity,
-                  height: 300,
-                  fit: BoxFit.cover,
-                  errorBuilder:
-                      (context, error, stackTrace) => Container(
-                        color: Colors.grey[300],
-                        child: const Center(
-                          child: Icon(Icons.broken_image, size: 50),
+                child:
+                    imageUrl != null && imageUrl.startsWith('http')
+                        ? Image.network(
+                          imageUrl,
+                          width: double.infinity,
+                          height: 300,
+                          fit: BoxFit.cover,
+                          errorBuilder:
+                              (context, error, stackTrace) => Container(
+                                color: Colors.grey[300],
+                                child: const Center(
+                                  child: Icon(Icons.broken_image, size: 50),
+                                ),
+                              ),
+                        )
+                        : Image.asset(
+                          imageUrl ?? 'assets/placeholder.png',
+                          width: double.infinity,
+                          height: 300,
+                          fit: BoxFit.cover,
+                          errorBuilder:
+                              (context, error, stackTrace) => Container(
+                                color: Colors.grey[300],
+                                child: const Center(
+                                  child: Icon(Icons.broken_image, size: 50),
+                                ),
+                              ),
                         ),
-                      ),
-                ),
               ),
             ),
+
             const SizedBox(height: 16),
 
             // Detail Produk
@@ -263,20 +277,38 @@ class _DetailPageState extends State<DetailPage> {
                                 topLeft: Radius.circular(12),
                                 topRight: Radius.circular(12),
                               ),
-                              child: Image.network(
-                                (relatedImage != null &&
-                                        relatedImage.isNotEmpty)
-                                    ? relatedImage
-                                    : 'https://via.placeholder.com/150',
-                                width: 130,
-                                height: 90,
-                                fit: BoxFit.cover,
-                                errorBuilder:
-                                    (context, error, stackTrace) => Container(
-                                      color: Colors.grey[300],
-                                      child: const Icon(Icons.broken_image),
-                                    ),
-                              ),
+                              child:
+                                  relatedImage != null &&
+                                          relatedImage.startsWith('http')
+                                      ? Image.network(
+                                        relatedImage,
+                                        width: 130,
+                                        height: 90,
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) =>
+                                                Container(
+                                                  color: Colors.grey[300],
+                                                  child: const Icon(
+                                                    Icons.broken_image,
+                                                  ),
+                                                ),
+                                      )
+                                      : Image.asset(
+                                        relatedImage ??
+                                            'assets/placeholder.png',
+                                        width: 130,
+                                        height: 90,
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) =>
+                                                Container(
+                                                  color: Colors.grey[300],
+                                                  child: const Icon(
+                                                    Icons.broken_image,
+                                                  ),
+                                                ),
+                                      ),
                             ),
                             Padding(
                               padding: const EdgeInsets.all(8.0),

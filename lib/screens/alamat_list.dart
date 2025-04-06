@@ -21,7 +21,7 @@ class _DaftarAlamatPageState extends State<DaftarAlamatPage> {
 
   Future<void> _loadAlamatUser() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('userId');
+    final userId = prefs.getInt('userId');
 
     if (userId != null) {
       final user = dummyAccounts.firstWhere(

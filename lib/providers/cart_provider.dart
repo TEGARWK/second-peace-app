@@ -1,22 +1,7 @@
 import 'package:flutter/material.dart';
 
 class CartProvider extends ChangeNotifier {
-  List<Map<String, dynamic>> _cartItems = [
-    {
-      'name': 'Baju Pria Hitam',
-      'price': 100000,
-      'quantity': 1,
-      'image': 'assets/baju.jpg',
-      'selected': false,
-    },
-    {
-      'name': 'Sepatu Sneakers',
-      'price': 250000,
-      'quantity': 1,
-      'image': 'assets/sepatu.jpg',
-      'selected': false,
-    },
-  ];
+  List<Map<String, dynamic>> _cartItems = [];
 
   List<Map<String, dynamic>> get items => _cartItems;
 
@@ -48,14 +33,18 @@ class CartProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// ✅ FIXED: Total price calculation now handles int/double properly
   int getTotalPrice() {
-    return _cartItems.fold<int>(
-      0,
-      (sum, item) =>
-          item['selected']
-              ? sum + (item['price'] * item['quantity']) as int
-              : sum,
-    );
+    return _cartItems.fold<int>(0, (sum, item) {
+      final price = (item['price'] as num).toInt();
+      final quantity = (item['quantity'] as num).toInt();
+      return item['selected'] == true ? sum + (price * quantity) : sum;
+    });
+  }
+
+  void setItems(List<Map<String, dynamic>> items) {
+    _cartItems = items;
+    notifyListeners();
   }
 
   void clearCart() {

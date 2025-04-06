@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:secondpeacem/screens/product_wrapper.dart';
+import 'package:secondpeacem/screens/home_page.dart';
 import 'package:secondpeacem/screens/orders_page.dart';
 import 'package:secondpeacem/screens/account_page.dart';
 import 'package:secondpeacem/widgets/custom_navbar.dart';
 import 'package:secondpeacem/providers/cart_provider.dart';
+import 'package:secondpeacem/data/dummy_products.dart'; // Tambahkan
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -57,10 +58,10 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
-  final List<Widget> _pages = const [
-    ProductWrapper(),
-    OrdersPage(),
-    AccountPage(),
+  final List<Widget> _pages = [
+    HomePage(products: dummyProducts),
+    const OrdersPage(),
+    const AccountPage(),
   ];
 
   void _onItemTapped(int index) {

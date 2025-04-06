@@ -1,27 +1,181 @@
-// /data/dummy_accounts.dart
-
 final List<Map<String, dynamic>> dummyAccounts = [
   {
-    "id": "user001",
+    "id": 1,
     "name": "John Doe",
     "email": "johndoe@example.com",
-    "password": "password123", // Tambahkan password
+    "password": "password123",
     "phone": "08123456789",
     "profileImage": "assets/images/avatar1.png",
     "addresses": [
       {"label": "Rumah", "address": "Jl. Kebon Jeruk No. 123, Jakarta"},
       {"label": "Kantor", "address": "Jl. Sudirman No. 45, Jakarta"},
     ],
+    "cart": [
+      {"productId": 101, "quantity": 2, "selected": false},
+    ],
+    "orders": [
+      {
+        "orderId": "INV123456",
+        "date": "2025-04-05",
+        "status": "Selesai",
+        "items": [
+          {
+            "productId": 103,
+            "name": "Kaos Thrift",
+            "quantity": 1,
+            "price": 35000,
+          },
+          {
+            "productId": 104,
+            "name": "Celana Cargo",
+            "quantity": 1,
+            "price": 95000,
+          },
+        ],
+        "total": 130000,
+        "shippingAddress": "Jl. Kebon Jeruk No. 123, Jakarta",
+        "paymentMethod": "Transfer Bank - BCA",
+        "courier": "JNE",
+        "trackingNumber": "JNE987654321",
+        "deliveryEstimate": "2025-04-07",
+        "note": "Tolong bungkus rapi ya",
+      },
+      {
+        "orderId": "INV123457",
+        "date": "2025-04-06",
+        "status": "Belum Bayar",
+        "items": [
+          {
+            "productId": 101,
+            "name": "Sweater Vintage",
+            "quantity": 1,
+            "price": 75000,
+          },
+        ],
+        "total": 75000,
+        "shippingAddress": "Jl. Kebon Jeruk No. 123, Jakarta",
+        "paymentMethod": "QRIS",
+        "courier": "SiCepat",
+        "trackingNumber": "",
+        "deliveryEstimate": "2025-04-09",
+        "note": "Tolong kirim cepat",
+      },
+      {
+        "orderId": "INV123460",
+        "date": "2025-04-07",
+        "status": "Dikirim",
+        "items": [
+          {
+            "productId": 102,
+            "name": "Jaket Denim",
+            "quantity": 1,
+            "price": 120000,
+          },
+        ],
+        "total": 120000,
+        "shippingAddress": "Jl. Kebon Jeruk No. 123, Jakarta",
+        "paymentMethod": "E-Wallet - Dana",
+        "courier": "J&T Express",
+        "trackingNumber": "JNT44556677",
+        "deliveryEstimate": "2025-04-10",
+        "note": "Kirim di jam kerja",
+      },
+    ],
   },
   {
-    "id": "user002",
+    "id": 2,
     "name": "Jane Smith",
     "email": "janesmith@example.com",
-    "password": "abc12345", // Tambahkan password
+    "password": "abc12345",
     "phone": "08198765432",
     "profileImage": "assets/images/avatar2.png",
     "addresses": [
       {"label": "Apartemen", "address": "Jl. Casablanca No. 88, Jakarta"},
+    ],
+    "cart": [
+      {"productId": 102, "quantity": 1, "selected": false},
+    ],
+    "orders": [
+      {
+        "orderId": "INV123418",
+        "date": "2025-04-06",
+        "status": "Belum Bayar",
+        "items": [
+          {
+            "productId": 101,
+            "name": "Sweater Vintage",
+            "quantity": 1,
+            "price": 75000,
+          },
+        ],
+        "total": 75000,
+        "shippingAddress": "Jl. Kebon Jeruk No. 123, Jakarta",
+        "paymentMethod": "QRIS",
+        "courier": "SiCepat",
+        "trackingNumber": "",
+        "deliveryEstimate": "2025-04-09",
+        "note": "Tolong kirim cepat",
+      },
+      {
+        "orderId": "INV123458",
+        "date": "2025-04-06",
+        "status": "Diproses",
+        "items": [
+          {
+            "productId": 103,
+            "name": "Kaos Oversize",
+            "quantity": 2,
+            "price": 50000,
+          },
+        ],
+        "total": 100000,
+        "shippingAddress": "Jl. Casablanca No. 88, Jakarta",
+        "paymentMethod": "Transfer Bank - Mandiri",
+        "courier": "AnterAja",
+        "trackingNumber": "",
+        "deliveryEstimate": "2025-04-08",
+        "note": "Hati-hati barang mudah rusak",
+      },
+      {
+        "orderId": "INV123459",
+        "date": "2025-04-04",
+        "status": "Dikirim",
+        "items": [
+          {
+            "productId": 104,
+            "name": "Celana Cargo",
+            "quantity": 1,
+            "price": 95000,
+          },
+        ],
+        "total": 95000,
+        "shippingAddress": "Jl. Casablanca No. 88, Jakarta",
+        "paymentMethod": "QRIS",
+        "courier": "SiCepat",
+        "trackingNumber": "SCP1234567890",
+        "deliveryEstimate": "2025-04-09",
+        "note": "",
+      },
+      {
+        "orderId": "INV123460",
+        "date": "2025-04-07",
+        "status": "Selesai",
+        "items": [
+          {
+            "productId": 102,
+            "name": "Jaket Denim",
+            "quantity": 1,
+            "price": 120000,
+          },
+        ],
+        "total": 120000,
+        "shippingAddress": "Jl. Casablanca No. 88, Jakarta",
+        "paymentMethod": "E-Wallet - Dana",
+        "courier": "J&T Express",
+        "trackingNumber": "JNT44556677",
+        "deliveryEstimate": "2025-04-10",
+        "note": "",
+      },
     ],
   },
 ];

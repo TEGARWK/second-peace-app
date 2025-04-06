@@ -255,11 +255,6 @@ class _AccountPageState extends State<AccountPage> {
           "Alamat Pengiriman",
           const DaftarAlamatPage(),
         ),
-        _buildMenuItem(
-          Icons.history,
-          "Riwayat Pesanan",
-          const RiwayatPesananPage(),
-        ),
         _buildMenuItem(Icons.logout, "Keluar", null, isLogout: true),
       ],
     );

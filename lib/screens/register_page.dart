@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:secondpeacem/screens/login_page.dart';
-import '../services/auth_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:secondpeacem/data/dummy_accounts.dart';
+import 'package:secondpeacem/main.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -10,90 +12,118 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
-  final _formKey = GlobalKey<FormState>();
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+  final nameController = TextEditingController();
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+
+  String? errorMessage;
+  bool _isLoading = false;
 
   Future<void> _register() async {
-    if (_formKey.currentState!.validate()) {
-      try {
-        final auth = AuthService();
-        final result = await auth.register(
-          _nameController.text.trim(),
-          _emailController.text.trim(),
-          _passwordController.text.trim(),
-        );
+    setState(() {
+      errorMessage = null;
+      _isLoading = true;
+    });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Register berhasil, silakan login!')),
-        );
+    final name = nameController.text.trim();
+    final email = emailController.text.trim();
+    final password = passwordController.text;
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Register gagal: $e')));
-      }
+    if (name.isEmpty || email.isEmpty || password.isEmpty) {
+      setState(() {
+        errorMessage = "Semua field wajib diisi.";
+        _isLoading = false;
+      });
+      return;
     }
+
+    final isExist = dummyAccounts.any((user) => user['email'] == email);
+    if (isExist) {
+      setState(() {
+        errorMessage = "Email sudah terdaftar.";
+        _isLoading = false;
+      });
+      return;
+    }
+
+    // Hitung ID baru
+    final newUserId = dummyAccounts.length + 1;
+
+    // Simulasi simpan akun baru ke dummyAccounts
+    dummyAccounts.add({
+      'id': newUserId,
+      'name': name,
+      'email': email,
+      'password': password,
+      'addresses': [], // Inisialisasi list alamat kosong
+    });
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLoggedIn', true);
+    await prefs.setInt('userId', newUserId);
+    await prefs.setString('userName', name);
+    await prefs.setString('userEmail', email);
+
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const MainScreen()),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(title: const Text("Register")),
+      appBar: AppBar(
+        title: const Text("Daftar"),
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+      ),
       body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(labelText: 'Name'),
-                  validator:
-                      (value) => value!.isEmpty ? 'Nama wajib diisi' : null,
-                ),
-                TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(labelText: 'Email'),
-                  validator:
-                      (value) => value!.isEmpty ? 'Email wajib diisi' : null,
-                ),
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Password'),
-                  validator:
-                      (value) =>
-                          value!.length < 6 ? 'Minimal 6 karakter' : null,
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: _register,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: const Text(
-                    "Register",
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text("Sudah punya akun? Login di sini"),
-                ),
-              ],
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'Nama Lengkap'),
             ),
-          ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              decoration: const InputDecoration(labelText: 'Email'),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: passwordController,
+              decoration: const InputDecoration(labelText: 'Password'),
+              obscureText: true,
+            ),
+            if (errorMessage != null) ...[
+              const SizedBox(height: 12),
+              Text(errorMessage!, style: const TextStyle(color: Colors.red)),
+            ],
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _isLoading ? null : _register,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.black,
+                minimumSize: const Size(double.infinity, 50),
+              ),
+              child:
+                  _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text("Daftar", style: TextStyle(fontSize: 16)),
+            ),
+          ],
         ),
       ),
     );
