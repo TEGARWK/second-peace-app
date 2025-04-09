@@ -1,4 +1,3 @@
-// === alamat_pengiriman_page.dart ===
 import 'package:flutter/material.dart';
 
 class AlamatPengirimanPage extends StatefulWidget {
@@ -75,57 +74,97 @@ class _AlamatPengirimanPageState extends State<AlamatPengirimanPage> {
           style: const TextStyle(color: Colors.white),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
-        backgroundColor: const Color.fromARGB(255, 32, 32, 32),
+        backgroundColor: Colors.black,
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
-          child: ListView(
-            children: [
-              _buildTextField("Nama Penerima", _namaController),
-              _buildTextField(
-                "Nomor HP",
-                _noHpController,
-                keyboardType: TextInputType.phone,
-              ),
-              _buildTextField(
-                "Alamat Lengkap",
-                _alamatLengkapController,
-                maxLines: 2,
-              ),
-              _buildTextField("Kota", _kotaController),
-              _buildTextField(
-                "Kode Pos",
-                _kodePosController,
-                keyboardType: TextInputType.number,
-              ),
-              SwitchListTile(
-                title: const Text("Jadikan Alamat Utama"),
-                value: isUtama,
-                onChanged: (value) {
-                  setState(() {
-                    isUtama = value;
-                  });
-                },
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _simpanAlamat,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color.fromARGB(255, 0, 0, 0),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: Text(
-                  widget.existingData == null ? "Simpan" : "Update",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+          child: Card(
+            elevation: 5,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Form Alamat Pengiriman",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  _buildTextField("Nama Penerima", _namaController),
+                  _buildTextField(
+                    "Nomor HP",
+                    _noHpController,
+                    keyboardType: TextInputType.phone,
+                  ),
+                  _buildTextField(
+                    "Alamat Lengkap",
+                    _alamatLengkapController,
+                    maxLines: 2,
+                  ),
+                  _buildTextField("Kota", _kotaController),
+                  _buildTextField(
+                    "Kode Pos",
+                    _kodePosController,
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Switch(
+                        value: isUtama,
+                        activeColor: Colors.green,
+                        onChanged: (value) {
+                          setState(() {
+                            isUtama = value;
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          "Jadikan alamat ini sebagai alamat utama",
+                          style: TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(
+                        Icons.save,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                      // icon: const Icon(Icons.save, color: Colors.white),
+                      onPressed: _simpanAlamat,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      label: Text(
+                        widget.existingData == null
+                            ? "Simpan Alamat"
+                            : "Update Alamat",
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -146,6 +185,8 @@ class _AlamatPengirimanPageState extends State<AlamatPengirimanPage> {
         keyboardType: keyboardType,
         decoration: InputDecoration(
           labelText: label,
+          filled: true,
+          fillColor: Colors.grey[100],
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
         ),
         validator: (value) => value!.isEmpty ? '$label wajib diisi' : null,

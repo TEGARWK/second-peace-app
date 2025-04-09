@@ -12,6 +12,7 @@ class DaftarAlamatPage extends StatefulWidget {
 
 class _DaftarAlamatPageState extends State<DaftarAlamatPage> {
   List<Map<String, dynamic>> alamatUser = [];
+  int? userId;
 
   @override
   void initState() {
@@ -21,7 +22,7 @@ class _DaftarAlamatPageState extends State<DaftarAlamatPage> {
 
   Future<void> _loadAlamatUser() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getInt('userId');
+    userId = prefs.getInt('userId');
 
     if (userId != null) {
       final user = dummyAccounts.firstWhere(
@@ -32,6 +33,19 @@ class _DaftarAlamatPageState extends State<DaftarAlamatPage> {
       setState(() {
         alamatUser = List<Map<String, dynamic>>.from(user['addresses'] ?? []);
       });
+    }
+  }
+
+  void _setAsPrimary(int index) async {
+    setState(() {
+      for (var i = 0; i < alamatUser.length; i++) {
+        alamatUser[i]['isPrimary'] = (i == index);
+      }
+    });
+
+    if (userId != null) {
+      final user = dummyAccounts.firstWhere((u) => u['id'] == userId);
+      user['addresses'] = alamatUser;
     }
   }
 
@@ -54,11 +68,14 @@ class _DaftarAlamatPageState extends State<DaftarAlamatPage> {
                 itemCount: alamatUser.length,
                 itemBuilder: (context, index) {
                   final alamat = alamatUser[index];
+                  final isPrimary = alamat['isPrimary'] == true;
+
                   return Card(
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                     margin: const EdgeInsets.only(bottom: 16),
+                    elevation: 4,
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
@@ -67,12 +84,36 @@ class _DaftarAlamatPageState extends State<DaftarAlamatPage> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                alamat['label'],
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              Row(
+                                children: [
+                                  Text(
+                                    alamat['label'],
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  if (isPrimary)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.shade100,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Text(
+                                        'Utama',
+                                        style: TextStyle(
+                                          color: Colors.green,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ],
                           ),
@@ -82,32 +123,31 @@ class _DaftarAlamatPageState extends State<DaftarAlamatPage> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              ElevatedButton(
-                                onPressed: () {
-                                  // Kirim balik data alamat ke halaman sebelumnya
-                                  Navigator.pop(context, alamat);
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.black,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 10,
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Pilih Alamat Ini',
-                                  style: TextStyle(color: Colors.white),
+                              Text(
+                                'Alamat ${index + 1}',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey,
                                 ),
                               ),
+                              if (isPrimary)
+                                const Text(
+                                  'Alamat Utama',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.green,
+                                  ),
+                                ),
                               Row(
                                 children: [
-                                  TextButton(
-                                    onPressed: () {},
-                                    child: const Text(
-                                      'Set Utama',
-                                      style: TextStyle(color: Colors.green),
+                                  if (!isPrimary)
+                                    TextButton(
+                                      onPressed: () => _setAsPrimary(index),
+                                      child: const Text(
+                                        'Set Utama',
+                                        style: TextStyle(color: Colors.green),
+                                      ),
                                     ),
-                                  ),
                                   TextButton(
                                     onPressed: () {
                                       Navigator.push(

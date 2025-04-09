@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:secondpeacem/data/dummy_products.dart';
 import 'package:secondpeacem/models/product.dart';
+import 'package:intl/intl.dart';
 import 'detail_page.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   final List<Product> products;
 
   const HomePage({super.key, required this.products});
 
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
   static const List<String> categories = [
     'pria',
     'wanita',
@@ -15,86 +22,185 @@ class HomePage extends StatelessWidget {
     'aksesoris',
   ];
 
+  late ScrollController _scrollController;
+  bool _showCategories = true;
+  double _lastOffset = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+
+    _scrollController.addListener(() {
+      double currentOffset = _scrollController.offset;
+
+      // Deteksi arah scroll manual
+      if (currentOffset > _lastOffset && _showCategories) {
+        // Scroll ke bawah, sembunyikan kategori
+        setState(() {
+          _showCategories = false;
+        });
+      } else if (currentOffset < _lastOffset && !_showCategories) {
+        // Scroll ke atas, tampilkan kategori
+        setState(() {
+          _showCategories = true;
+        });
+      }
+
+      _lastOffset = currentOffset;
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  String formatRupiah(double price) {
+    final format = NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp',
+      decimalDigits: 0,
+    );
+    return format.format(price);
+  }
+
   @override
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          const SizedBox(height: 10),
-          buildCategorySection(),
-          Expanded(
-            child: Padding(
+      body: SafeArea(
+        child: CustomScrollView(
+          slivers: [
+            // Search Bar dan tombol kategori
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Cari produk...',
+                          prefixIcon: const Icon(Icons.search),
+                          contentPadding: const EdgeInsets.all(12),
+                          filled: true,
+                          fillColor: Colors.grey[100],
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _showCategories = !_showCategories;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.category),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Animated Category
+            SliverToBoxAdapter(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                switchInCurve: Curves.easeInOut,
+                switchOutCurve: Curves.easeInOut,
+                transitionBuilder: (Widget child, Animation<double> animation) {
+                  final offsetAnimation = Tween<Offset>(
+                    begin: const Offset(0, -0.2),
+                    end: Offset.zero,
+                  ).animate(animation);
+                  return FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: offsetAnimation,
+                      child: child,
+                    ),
+                  );
+                },
+                child:
+                    _showCategories
+                        ? Padding(
+                          key: const ValueKey(
+                            true,
+                          ), // Important for AnimatedSwitcher
+                          padding: const EdgeInsets.only(top: 8, left: 16),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children:
+                                  categories.map((label) {
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          CircleAvatar(
+                                            radius: 26,
+                                            backgroundImage: AssetImage(
+                                              'assets/$label.jpg',
+                                            ),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            label[0].toUpperCase() +
+                                                label.substring(1),
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                            ),
+                          ),
+                        )
+                        : const SizedBox.shrink(key: ValueKey(false)),
+              ),
+            ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 12)),
+
+            // Produk grid
+            SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: GridView.builder(
-                padding: const EdgeInsets.only(top: 10),
-                itemCount: dummyProducts.length,
+              sliver: SliverGrid(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) =>
+                      _buildProductItem(context, dummyProducts[index]),
+                  childCount: dummyProducts.length,
+                ),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: screenWidth > 600 ? 3 : 2,
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 16,
                   childAspectRatio: 0.75,
                 ),
-                itemBuilder:
-                    (context, index) =>
-                        _buildProductItem(context, dummyProducts[index]),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget buildCategorySection() {
-    return SizedBox(
-      height: 90,
-      child: Center(
-        child: ListView.builder(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          itemCount: categories.length,
-          itemBuilder: (context, index) {
-            return _buildCategoryItem(categories[index]);
-          },
+          ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildCategoryItem(String label) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      child: Column(
-        children: [
-          GestureDetector(
-            onTap: () {},
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.4),
-                    blurRadius: 6,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: CircleAvatar(
-                radius: 30,
-                backgroundImage: AssetImage('assets/$label.jpg'),
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label[0].toUpperCase() + label.substring(1),
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-          ),
-        ],
       ),
     );
   }
@@ -128,44 +234,14 @@ class HomePage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(14),
-                  ),
-                  child: AspectRatio(
-                    aspectRatio: 1.1,
-                    child: _buildProductImage(product),
-                  ),
-                ),
-                Positioned(
-                  bottom: 8,
-                  right: 8,
-                  child: GestureDetector(
-                    onTap: () {},
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      padding: const EdgeInsets.all(6),
-                      child: const Icon(
-                        Icons.add_shopping_cart,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(14),
+              ),
+              child: AspectRatio(
+                aspectRatio: 1.1,
+                child: _buildProductImage(product),
+              ),
             ),
             Expanded(
               child: Padding(
@@ -184,7 +260,7 @@ class HomePage extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      "Rp ${product.price.toStringAsFixed(0)}",
+                      formatRupiah(product.price),
                       style: const TextStyle(
                         fontSize: 14,
                         color: Colors.red,

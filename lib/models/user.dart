@@ -1,20 +1,25 @@
 class Address {
   final String label;
   final String address;
+  final bool isPrimary;
 
-  Address({required this.label, required this.address});
+  Address({required this.label, required this.address, this.isPrimary = false});
 
   factory Address.fromMap(Map<String, dynamic> map) {
-    return Address(label: map['label'], address: map['address']);
+    return Address(
+      label: map['label'],
+      address: map['address'],
+      isPrimary: map['isPrimary'] ?? false,
+    );
   }
 
   Map<String, dynamic> toMap() {
-    return {'label': label, 'address': address};
+    return {'label': label, 'address': address, 'isPrimary': isPrimary};
   }
 }
 
 class User {
-  final String id;
+  final int id;
   String name;
   String email;
   String password;

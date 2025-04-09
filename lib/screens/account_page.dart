@@ -4,10 +4,11 @@ import 'login_page.dart';
 import 'register_page.dart';
 import 'edit_profile_page.dart';
 import 'alamat_list.dart';
-import 'riwayat_pesanan_page.dart';
 import 'cart_page.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
+import '../services/order_service.dart'; // pastikan ada file ini untuk ambil data dari API
+import 'orders_page.dart'; // pastikan file ini ada dan memiliki OrdersPage widget
 
 class AccountPage extends StatefulWidget {
   const AccountPage({super.key});
@@ -21,6 +22,14 @@ class _AccountPageState extends State<AccountPage> {
   String? userName;
   String? userEmail;
 
+  // Map status pesanan dan jumlahnya
+  Map<String, int> orderCounts = {
+    'Belum Bayar': 0,
+    'Diproses': 0,
+    'Dikirim': 0,
+    'Selesai': 0,
+  };
+
   @override
   void initState() {
     super.initState();
@@ -31,14 +40,15 @@ class _AccountPageState extends State<AccountPage> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     bool loggedIn = prefs.getBool('isLoggedIn') ?? false;
     String? email = prefs.getString('userEmail');
-    String? name = prefs.getString('userName'); // Ambil nama dari prefs juga
+    String? name = prefs.getString('userName');
 
     if (loggedIn && email != null) {
       setState(() {
         isLoggedIn = true;
-        userName = name ?? "User"; // fallback ke 'User' kalau null
+        userName = name ?? "User";
         userEmail = email;
       });
+      _fetchOrderCounts(); // fetch order setelah login
     } else {
       setState(() {
         isLoggedIn = false;
@@ -46,6 +56,14 @@ class _AccountPageState extends State<AccountPage> {
         userEmail = null;
       });
     }
+  }
+
+  Future<void> _fetchOrderCounts() async {
+    // Ganti ini dengan pemanggilan API sesungguhnya jika ada
+    final counts = await OrderService.getOrderCounts(userEmail!);
+    setState(() {
+      orderCounts = counts;
+    });
   }
 
   Future<void> _logout() async {
@@ -208,41 +226,54 @@ class _AccountPageState extends State<AccountPage> {
   Widget _buildPesananSaya() {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Column(
         children: [
           ListTile(
-            title: const Text("Pesanan Saya"),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+            title: const Text(
+              "Pesanan Saya",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const RiwayatPesananPage()),
+                MaterialPageRoute(builder: (_) => const OrdersPage()),
               );
             },
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _orderIcon(Icons.payment, "Belum Bayar"),
-                _orderIcon(Icons.local_shipping, "Dikirim"),
-                _orderIcon(Icons.inbox, "Dikemas"),
+                _orderIcon(
+                  Icons.payment,
+                  "Belum Bayar",
+                  orderCounts['Belum Bayar'],
+                ),
+                _orderIcon(
+                  Icons.inventory_2_outlined,
+                  "Diproses",
+                  orderCounts['Diproses'],
+                ),
+                _orderIcon(
+                  Icons.local_shipping,
+                  "Dikirim",
+                  orderCounts['Dikirim'],
+                ),
+                _orderIcon(
+                  Icons.check_circle,
+                  "Selesai",
+                  orderCounts['Selesai'],
+                ),
               ],
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _orderIcon(IconData icon, String label) {
-    return Column(
-      children: [
-        Icon(icon, color: Colors.black54),
-        const SizedBox(height: 4),
-        Text(label, style: const TextStyle(fontSize: 12)),
-      ],
     );
   }
 
@@ -260,38 +291,88 @@ class _AccountPageState extends State<AccountPage> {
     );
   }
 
+  Widget _orderIcon(IconData icon, String label, int? count) {
+    return Stack(
+      children: [
+        Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: Colors.black54, size: 24),
+            ),
+            const SizedBox(height: 6),
+            Text(label, style: const TextStyle(fontSize: 12)),
+          ],
+        ),
+        if ((count ?? 0) > 0)
+          Positioned(
+            top: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+              child: Text(
+                '$count',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildMenuItem(
     IconData icon,
     String title,
     Widget? page, {
     bool isLogout = false,
   }) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.black87),
-      title: Text(
-        title,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Card(
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        child: ListTile(
+          leading: Icon(icon, color: Colors.black87),
+          title: Text(
+            title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+          subtitle: isLogout ? const Text("Keluar dari akun") : null,
+          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+          onTap: () async {
+            if (isLogout) {
+              await _logout();
+            } else if (page != null) {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => page),
+              );
+              _checkLoginStatus();
+            }
+          },
+        ),
       ),
-      subtitle: isLogout ? const Text("Keluar dari akun") : null,
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-      onTap: () async {
-        if (isLogout) {
-          await _logout();
-        } else if (page != null) {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => page),
-          );
-          // Refresh data setelah balik dari halaman lain
-          _checkLoginStatus();
-        }
-      },
     );
   }
 
   Widget _buildLoggedOutView() {
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: Column(
         children: [
           ElevatedButton.icon(
@@ -304,6 +385,9 @@ class _AccountPageState extends State<AccountPage> {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.black,
               minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             icon: const Icon(Icons.login, color: Colors.white),
             label: const Text(
@@ -311,7 +395,7 @@ class _AccountPageState extends State<AccountPage> {
               style: TextStyle(color: Colors.white, fontSize: 16),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           OutlinedButton.icon(
             onPressed: () {
               Navigator.push(
@@ -321,6 +405,9 @@ class _AccountPageState extends State<AccountPage> {
             },
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
               side: const BorderSide(color: Colors.black),
             ),
             icon: const Icon(Icons.app_registration, color: Colors.black),

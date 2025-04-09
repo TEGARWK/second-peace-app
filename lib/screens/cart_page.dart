@@ -5,9 +5,9 @@ import '../providers/cart_provider.dart';
 import 'checkout_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/product.dart';
-
 import '../data/dummy_accounts.dart';
 import '../data/dummy_products.dart'; // ⬅️ Tambahan ini penting
+import 'package:intl/intl.dart';
 
 class CartPage extends StatefulWidget {
   const CartPage({super.key});
@@ -68,6 +68,15 @@ class _CartPageState extends State<CartPage> {
         }
       }
     });
+  }
+
+  String formatRupiah(dynamic value) {
+    final formatter = NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp',
+      decimalDigits: 0,
+    );
+    return formatter.format(value);
   }
 
   @override
@@ -154,7 +163,7 @@ class _CartPageState extends State<CartPage> {
                                         ),
                                       ),
                                       subtitle: Text(
-                                        'Rp ${item['price'] ?? 0}',
+                                        formatRupiah(item['price'] ?? 0),
                                         style: const TextStyle(
                                           fontSize: 14,
                                           color: Colors.red,
@@ -228,7 +237,8 @@ class _CartPageState extends State<CartPage> {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   Text(
-                    'Rp ${cartProvider.getTotalPrice()}',
+                    formatRupiah(cartProvider.getTotalPrice()),
+
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,

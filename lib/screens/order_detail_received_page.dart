@@ -129,13 +129,6 @@ class OrderDetailReceivedPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    product.name ?? 'Produk',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
                   const SizedBox(height: 6),
                   Text("Jumlah: ${order['items'][0]['quantity']}"),
                   Text(

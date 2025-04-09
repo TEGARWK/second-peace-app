@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:secondpeacem/data/dummy_products.dart';
 import 'package:secondpeacem/models/product.dart';
 import 'package:secondpeacem/data/dummy_accounts.dart'; // Mengambil data akun
+import 'package:intl/intl.dart';
 
 class OrderDetailShippedPage extends StatelessWidget {
   final Map<String, dynamic> order;
@@ -13,6 +14,15 @@ class OrderDetailShippedPage extends StatelessWidget {
     required this.order,
     required this.tabStatus,
   });
+
+  String formatCurrency(double amount) {
+    final formatter = NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    );
+    return formatter.format(amount);
+  }
 
   void _trackPackage(String courier, String trackingNumber) async {
     String url = '';
@@ -156,16 +166,16 @@ class OrderDetailShippedPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    product.name ?? 'Produk',
+                    product.name,
                     style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text("Jumlah: ${order['items'][0]['quantity']}"),
                   Text(
-                    "Harga: Rp ${product.price}",
+                    "Harga: ${formatCurrency(product.price)}",
                     style: const TextStyle(
                       fontSize: 14,
                       color: Colors.red,
@@ -230,67 +240,6 @@ class OrderDetailShippedPage extends StatelessWidget {
     );
   }
 
-  Widget _buildTotalSection() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 3, offset: Offset(0, 2)),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text(
-            'Total Pembayaran',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-          Text(
-            'Rp ${order['total']}',
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.red,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPayButton(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(color: Colors.black26, blurRadius: 5, offset: Offset(0, 2)),
-        ],
-      ),
-      child: ElevatedButton.icon(
-        onPressed: () {
-          // Integrasi Midtrans nanti
-        },
-        icon: const Icon(Icons.payment, color: Colors.white),
-        label: const Text(
-          'Bayar Sekarang',
-          style: TextStyle(fontSize: 16, color: Colors.white),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red,
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          minimumSize: const Size.fromHeight(50),
-        ),
-      ),
-    );
-  }
-
   Widget _buildBottomBar(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -309,7 +258,7 @@ class OrderDetailShippedPage extends StatelessWidget {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
               ),
               Text(
-                'Rp ${order['total']}',
+                formatCurrency(order['total']?.toDouble() ?? 0.0),
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,

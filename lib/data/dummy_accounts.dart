@@ -7,8 +7,16 @@ final List<Map<String, dynamic>> dummyAccounts = [
     "phone": "08123456789",
     "profileImage": "assets/images/avatar1.png",
     "addresses": [
-      {"label": "Rumah", "address": "Jl. Kebon Jeruk No. 123, Jakarta"},
-      {"label": "Kantor", "address": "Jl. Sudirman No. 45, Jakarta"},
+      {
+        "label": "Rumah",
+        "address": "Jl. Kebon Jeruk No. 123, Jakarta",
+        "isPrimary": true,
+      },
+      {
+        "label": "Kantor",
+        "address": "Jl. Sudirman No. 45, Jakarta",
+        "isPrimary": false,
+      },
     ],
     "cart": [
       {"productId": 101, "quantity": 2, "selected": false},
@@ -90,10 +98,22 @@ final List<Map<String, dynamic>> dummyAccounts = [
     "phone": "08198765432",
     "profileImage": "assets/images/avatar2.png",
     "addresses": [
-      {"label": "Apartemen", "address": "Jl. Casablanca No. 88, Jakarta"},
+      {
+        "label": "Apartemen",
+        "address": "Jl. Casablanca No. 88, Jakarta",
+        "isPrimary": false,
+      },
+      {
+        "label": "Rumah",
+        "address": "Jl. Jendral Sudirman No. 05",
+        "isPrimary": true,
+      },
     ],
     "cart": [
       {"productId": 102, "quantity": 1, "selected": false},
+      {"productId": 103, "quantity": 1, "selected": false},
+      {"productId": 104, "quantity": 1, "selected": false},
+      {"productId": 101, "quantity": 2, "selected": false},
     ],
     "orders": [
       {

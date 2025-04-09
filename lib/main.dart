@@ -5,7 +5,7 @@ import 'package:secondpeacem/screens/orders_page.dart';
 import 'package:secondpeacem/screens/account_page.dart';
 import 'package:secondpeacem/widgets/custom_navbar.dart';
 import 'package:secondpeacem/providers/cart_provider.dart';
-import 'package:secondpeacem/data/dummy_products.dart'; // Tambahkan
+import 'package:secondpeacem/data/dummy_products.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -80,9 +80,9 @@ class _MainScreenState extends State<MainScreen> {
       appBar:
           isAccountPage
               ? null
-              : PreferredSize(
-                preferredSize: const Size.fromHeight(80),
-                child: CustomNavbar(showSearchBox: _selectedIndex == 0),
+              : const PreferredSize(
+                preferredSize: Size.fromHeight(80),
+                child: CustomNavbar(),
               ),
       body: SafeArea(top: !isAccountPage, child: _pages[_selectedIndex]),
       bottomNavigationBar: BottomNavigationBar(

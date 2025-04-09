@@ -155,9 +155,10 @@ class _DetailPageState extends State<DetailPage> {
                                   selectedItems: [
                                     {
                                       'name': widget.product.name,
-                                      'price': widget.product.price,
+                                      'price': widget.product.price.toDouble(),
                                       'quantity': 1,
-                                      'image': imageUrl,
+                                      'image':
+                                          imageUrl ?? 'assets/placeholder.png',
                                     },
                                   ],
                                 ),

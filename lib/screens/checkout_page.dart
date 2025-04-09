@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/custom_navbar.dart';
 import '../data/dummy_accounts.dart';
-import '../models/user.dart';
+import '../models/user.dart'; // ✅ pastikan ini benar!
 import 'alamat_list.dart';
 
 class CheckoutPage extends StatefulWidget {
@@ -38,19 +38,29 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   Future<void> _loadUser() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? userId = prefs.getString('userId');
+    final userId = prefs.getInt('userId');
 
-    if (userId != null) {
-      final userMap = dummyAccounts.firstWhere((u) => u['id'] == userId);
-      final user = User.fromMap(userMap);
+    if (userId == null) return;
 
-      setState(() {
-        userName = user.name;
-        if (user.addresses.isNotEmpty) {
-          userAddress = user.addresses.first.address;
-        }
-      });
-    }
+    final userMap = dummyAccounts.firstWhere(
+      (u) => u['id'] == userId,
+      orElse: () => <String, dynamic>{},
+    );
+
+    if (userMap.isEmpty) return;
+
+    final loadedUser = User.fromMap(
+      userMap,
+    ); // ✅ pakai nama variabel beda jika perlu
+
+    setState(() {
+      userName = loadedUser.name;
+      if (loadedUser.addresses.isNotEmpty) {
+        // ✨ Perbaikan agar tidak error isPrimary
+        final defaultAddress = loadedUser.addresses.first;
+        userAddress = defaultAddress.address;
+      }
+    });
   }
 
   List<String> _generateDateRange(int days) {
@@ -187,7 +197,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   Widget build(BuildContext context) {
     double totalPrice = widget.selectedItems.fold(
       0,
-      (sum, item) => sum + (item['price'] as int),
+      (sum, item) => sum + (item['price'] as double),
     );
 
     return Scaffold(
@@ -212,9 +222,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
             const SizedBox(height: 20),
             _buildSectionTitle('Metode Pembayaran'),
             _buildPaymentDisplay(),
-            const SizedBox(
-              height: 80,
-            ), // Kasih jarak agar konten gak ketutupan footer
+            const SizedBox(height: 80),
           ],
         ),
       ),
