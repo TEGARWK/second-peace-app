@@ -1,6 +1,17 @@
 import 'package:flutter/material.dart';
+import '../services/cart_service.dart';
 
 class CartProvider extends ChangeNotifier {
+  CartService
+  cartService; // ❗ ubah dari `final` ke normal agar bisa di-set ulang
+
+  CartProvider({required this.cartService});
+
+  // Setter untuk injeksi ulang cartService (digunakan setelah login)
+  set setCartService(CartService newService) {
+    cartService = newService;
+  }
+
   List<Map<String, dynamic>> _cartItems = [];
 
   List<Map<String, dynamic>> get items => _cartItems;
@@ -11,14 +22,36 @@ class CartProvider extends ChangeNotifier {
       _cartItems.isNotEmpty &&
       _cartItems.every((item) => item['selected'] == true);
 
-  void addItem(Map<String, dynamic> item) {
-    _cartItems.add(item);
-    notifyListeners();
+  Future<void> fetchCart() async {
+    try {
+      final data = await cartService.fetchCartItems();
+      _cartItems =
+          data.map<Map<String, dynamic>>((item) {
+            return {...(item as Map<String, dynamic>), 'selected': true};
+          }).toList();
+      notifyListeners();
+    } catch (e) {
+      print('Error fetchCart: $e');
+    }
   }
 
-  void removeItem(int index) {
-    _cartItems.removeAt(index);
-    notifyListeners();
+  Future<void> addItem(int produkId, int jumlah) async {
+    try {
+      await cartService.addToCart(produkId, jumlah);
+      await fetchCart(); // refresh list setelah tambah
+    } catch (e) {
+      print('Error addItem: $e');
+    }
+  }
+
+  Future<void> removeItem(int keranjangId) async {
+    try {
+      await cartService.removeFromCart(keranjangId);
+      _cartItems.removeWhere((item) => item['id'] == keranjangId);
+      notifyListeners();
+    } catch (e) {
+      print('Error removeItem: $e');
+    }
   }
 
   void toggleSelect(int index) {
@@ -33,18 +66,12 @@ class CartProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// ✅ FIXED: Total price calculation now handles int/double properly
   int getTotalPrice() {
     return _cartItems.fold<int>(0, (sum, item) {
-      final price = (item['price'] as num).toInt();
-      final quantity = (item['quantity'] as num).toInt();
+      final price = (item['produk']['harga'] as num).toInt();
+      final quantity = (item['jumlah'] as num).toInt();
       return item['selected'] == true ? sum + (price * quantity) : sum;
     });
-  }
-
-  void setItems(List<Map<String, dynamic>> items) {
-    _cartItems = items;
-    notifyListeners();
   }
 
   void clearCart() {

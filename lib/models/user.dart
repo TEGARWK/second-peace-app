@@ -1,66 +1,43 @@
 class Address {
-  final String label;
-  final String address;
+  final int id;
+  final String nama;
+  final String telepon;
+  final String alamat;
+  final String kota;
+  final String kodePos;
   final bool isPrimary;
 
-  Address({required this.label, required this.address, this.isPrimary = false});
+  Address({
+    required this.id,
+    required this.nama,
+    required this.telepon,
+    required this.alamat,
+    required this.kota,
+    required this.kodePos,
+    this.isPrimary = false,
+  });
 
   factory Address.fromMap(Map<String, dynamic> map) {
     return Address(
-      label: map['label'],
-      address: map['address'],
-      isPrimary: map['isPrimary'] ?? false,
-    );
-  }
-
-  Map<String, dynamic> toMap() {
-    return {'label': label, 'address': address, 'isPrimary': isPrimary};
-  }
-}
-
-class User {
-  final int id;
-  String name;
-  String email;
-  String password;
-  String phone;
-  String profileImage;
-  List<Address> addresses;
-
-  User({
-    required this.id,
-    required this.name,
-    required this.email,
-    required this.password,
-    required this.phone,
-    required this.profileImage,
-    required this.addresses,
-  });
-
-  factory User.fromMap(Map<String, dynamic> map) {
-    return User(
       id: map['id'],
-      name: map['name'],
-      email: map['email'],
-      password: map['password'],
-      phone: map['phone'],
-      profileImage: map['profileImage'],
-      addresses:
-          (map['addresses'] as List)
-              .map((addr) => Address.fromMap(addr))
-              .toList(),
+      nama: map['nama'] ?? '',
+      telepon: map['telepon'] ?? '',
+      alamat: map['alamat'] ?? '',
+      kota: map['kota'] ?? '',
+      kodePos: map['kodePos'] ?? '',
+      isPrimary: map['utama'] ?? false, // Laravel pakai `utama`
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'name': name,
-      'email': email,
-      'password': password,
-      'phone': phone,
-      'profileImage': profileImage,
-      'addresses': addresses.map((addr) => addr.toMap()).toList(),
+      'nama': nama,
+      'telepon': telepon,
+      'alamat': alamat,
+      'kota': kota,
+      'kodePos': kodePos,
+      'utama': isPrimary,
     };
   }
 }

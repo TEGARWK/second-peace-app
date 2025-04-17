@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
 
 class AlamatPengirimanPage extends StatefulWidget {
   final Map<String, dynamic>? existingData;
@@ -19,6 +20,7 @@ class _AlamatPengirimanPageState extends State<AlamatPengirimanPage> {
   late TextEditingController _kodePosController;
 
   bool isUtama = false;
+  bool isLoading = false;
 
   @override
   void initState() {
@@ -38,7 +40,9 @@ class _AlamatPengirimanPageState extends State<AlamatPengirimanPage> {
     _kodePosController = TextEditingController(
       text: widget.existingData?['kodePos'] ?? '',
     );
-    isUtama = widget.existingData?['utama'] ?? false;
+    isUtama =
+        widget.existingData?['utama'] == true ||
+        widget.existingData?['utama'] == 1;
   }
 
   @override
@@ -51,9 +55,13 @@ class _AlamatPengirimanPageState extends State<AlamatPengirimanPage> {
     super.dispose();
   }
 
-  void _simpanAlamat() {
+  Future<void> _simpanAlamat() async {
     if (_formKey.currentState!.validate()) {
-      final newAlamat = {
+      setState(() {
+        isLoading = true;
+      });
+
+      final data = {
         'nama': _namaController.text.trim(),
         'telepon': _noHpController.text.trim(),
         'alamat': _alamatLengkapController.text.trim(),
@@ -61,8 +69,39 @@ class _AlamatPengirimanPageState extends State<AlamatPengirimanPage> {
         'kodePos': _kodePosController.text.trim(),
         'utama': isUtama,
       };
-      Navigator.pop(context, newAlamat);
+
+      try {
+        final result = await AuthService().addAddress(
+          nama: _namaController.text.trim(),
+          telepon: _noHpController.text.trim(),
+          alamat: _alamatLengkapController.text.trim(),
+          kota: _kotaController.text.trim(),
+          kodePos: _kodePosController.text.trim(),
+          utama: isUtama,
+        );
+
+        if (result['success'] == true) {
+          Navigator.pop(
+            context,
+            true,
+          ); // balik ke halaman list & trigger reload
+        } else {
+          _showError(result['message'] ?? 'Gagal menyimpan alamat.');
+        }
+      } catch (e) {
+        _showError('Terjadi kesalahan saat menyimpan alamat.');
+      } finally {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
   }
 
   @override
@@ -142,8 +181,7 @@ class _AlamatPengirimanPageState extends State<AlamatPengirimanPage> {
                         color: Colors.white,
                         size: 18,
                       ),
-                      // icon: const Icon(Icons.save, color: Colors.white),
-                      onPressed: _simpanAlamat,
+                      onPressed: isLoading ? null : _simpanAlamat,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.black,
                         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -152,7 +190,9 @@ class _AlamatPengirimanPageState extends State<AlamatPengirimanPage> {
                         ),
                       ),
                       label: Text(
-                        widget.existingData == null
+                        isLoading
+                            ? "Menyimpan..."
+                            : widget.existingData == null
                             ? "Simpan Alamat"
                             : "Update Alamat",
                         style: const TextStyle(

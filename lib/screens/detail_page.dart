@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:secondpeacem/models/product.dart';
-import 'package:secondpeacem/screens/checkout_page.dart';
-import 'package:secondpeacem/widgets/custom_navbar.dart';
-import 'package:secondpeacem/providers/cart_provider.dart';
+import '../models/product.dart';
+import '../screens/checkout_page.dart';
+import '../widgets/custom_navbar.dart';
+import '../providers/cart_provider.dart';
 
 class DetailPage extends StatefulWidget {
   final Product product;
@@ -31,6 +31,9 @@ class _DetailPageState extends State<DetailPage> {
   @override
   Widget build(BuildContext context) {
     final imageUrl = widget.product.imageUrl;
+    final relatedProducts =
+        widget.relatedProducts.where((p) => p.id != widget.product.id).toList();
+
     return Scaffold(
       appBar: const CustomNavbar(
         isDetailPage: true,
@@ -42,7 +45,7 @@ class _DetailPageState extends State<DetailPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Hero(
-              tag: imageUrl ?? 'placeholder',
+              tag: 'product-${widget.product.id}',
               child: ClipRRect(
                 borderRadius: const BorderRadius.only(
                   bottomLeft: Radius.circular(20),
@@ -55,33 +58,18 @@ class _DetailPageState extends State<DetailPage> {
                           width: double.infinity,
                           height: 300,
                           fit: BoxFit.cover,
-                          errorBuilder:
-                              (context, error, stackTrace) => Container(
-                                color: Colors.grey[300],
-                                child: const Center(
-                                  child: Icon(Icons.broken_image, size: 50),
-                                ),
-                              ),
+                          errorBuilder: (_, __, ___) => _errorImage(),
                         )
                         : Image.asset(
                           imageUrl ?? 'assets/placeholder.png',
                           width: double.infinity,
                           height: 300,
                           fit: BoxFit.cover,
-                          errorBuilder:
-                              (context, error, stackTrace) => Container(
-                                color: Colors.grey[300],
-                                child: const Center(
-                                  child: Icon(Icons.broken_image, size: 50),
-                                ),
-                              ),
+                          errorBuilder: (_, __, ___) => _errorImage(),
                         ),
               ),
             ),
-
             const SizedBox(height: 16),
-
-            // Detail Produk
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
@@ -114,18 +102,18 @@ class _DetailPageState extends State<DetailPage> {
                   const SizedBox(height: 16),
                   Text(
                     showFullDescription
-                        ? widget.product.description ?? ''
+                        ? (widget.product.description ?? '').trim()
                         : ((widget.product.description?.length ?? 0) > 100
                             ? "${widget.product.description!.substring(0, 100)}..."
-                            : widget.product.description ?? ''),
+                            : (widget.product.description ?? '').trim()),
                     maxLines: showFullDescription ? null : 3,
                     style: const TextStyle(fontSize: 16, color: Colors.black87),
                   ),
                   TextButton(
                     onPressed: () {
-                      setState(() {
-                        showFullDescription = !showFullDescription;
-                      });
+                      setState(
+                        () => showFullDescription = !showFullDescription,
+                      );
                     },
                     child: Text(
                       showFullDescription
@@ -139,7 +127,7 @@ class _DetailPageState extends State<DetailPage> {
             ),
             const SizedBox(height: 16),
 
-            // Tombol Aksi
+            // Tombol aksi
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Row(
@@ -151,7 +139,7 @@ class _DetailPageState extends State<DetailPage> {
                           context,
                           MaterialPageRoute(
                             builder:
-                                (context) => CheckoutPage(
+                                (_) => CheckoutPage(
                                   selectedItems: [
                                     {
                                       'name': widget.product.name,
@@ -188,29 +176,35 @@ class _DetailPageState extends State<DetailPage> {
                         BoxShadow(
                           color: Colors.black12,
                           blurRadius: 4,
-                          offset: const Offset(0, 2),
+                          offset: Offset(0, 2),
                         ),
                       ],
                     ),
                     child: IconButton(
-                      onPressed: () {
-                        Provider.of<CartProvider>(
-                          context,
-                          listen: false,
-                        ).addItem({
-                          'name': widget.product.name,
-                          'price': widget.product.price,
-                          'image': imageUrl,
-                          'selected': false,
-                          'quantity': 1,
-                        });
+                      // ✅ tambahkan child:
+                      onPressed: () async {
+                        try {
+                          await Provider.of<CartProvider>(
+                            context,
+                            listen: false,
+                          ).addItem(widget.product.id, 1);
 
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Produk ditambahkan ke keranjang!'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Produk ditambahkan ke keranjang!'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Gagal menambahkan produk ke keranjang!',
+                              ),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
                       },
                       icon: const Icon(
                         Icons.shopping_cart_outlined,
@@ -225,7 +219,7 @@ class _DetailPageState extends State<DetailPage> {
             const SizedBox(height: 30),
 
             // Produk Terkait
-            if (widget.relatedProducts.isNotEmpty) ...[
+            if (relatedProducts.isNotEmpty) ...[
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16.0),
                 child: Text(
@@ -238,20 +232,21 @@ class _DetailPageState extends State<DetailPage> {
                 height: 170,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
-                  itemCount: widget.relatedProducts.length,
+                  itemCount: relatedProducts.length,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   itemBuilder: (context, index) {
-                    final related = widget.relatedProducts[index];
+                    final related = relatedProducts[index];
                     final relatedImage = related.imageUrl;
+
                     return GestureDetector(
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder:
-                                (context) => DetailPage(
+                                (_) => DetailPage(
                                   product: related,
-                                  relatedProducts: widget.relatedProducts,
+                                  relatedProducts: relatedProducts,
                                 ),
                           ),
                         );
@@ -266,7 +261,7 @@ class _DetailPageState extends State<DetailPage> {
                             BoxShadow(
                               color: Colors.black12,
                               blurRadius: 4,
-                              offset: const Offset(0, 2),
+                              offset: Offset(0, 2),
                             ),
                           ],
                         ),
@@ -287,13 +282,7 @@ class _DetailPageState extends State<DetailPage> {
                                         height: 90,
                                         fit: BoxFit.cover,
                                         errorBuilder:
-                                            (context, error, stackTrace) =>
-                                                Container(
-                                                  color: Colors.grey[300],
-                                                  child: const Icon(
-                                                    Icons.broken_image,
-                                                  ),
-                                                ),
+                                            (_, __, ___) => _errorImage(),
                                       )
                                       : Image.asset(
                                         relatedImage ??
@@ -302,13 +291,7 @@ class _DetailPageState extends State<DetailPage> {
                                         height: 90,
                                         fit: BoxFit.cover,
                                         errorBuilder:
-                                            (context, error, stackTrace) =>
-                                                Container(
-                                                  color: Colors.grey[300],
-                                                  child: const Icon(
-                                                    Icons.broken_image,
-                                                  ),
-                                                ),
+                                            (_, __, ___) => _errorImage(),
                                       ),
                             ),
                             Padding(
@@ -349,6 +332,13 @@ class _DetailPageState extends State<DetailPage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _errorImage() {
+    return Container(
+      color: Colors.grey[300],
+      child: const Center(child: Icon(Icons.broken_image, size: 50)),
     );
   }
 }

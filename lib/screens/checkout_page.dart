@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/custom_navbar.dart';
-import '../data/dummy_accounts.dart';
-import '../models/user.dart'; // ✅ pastikan ini benar!
+import '../services/auth_service.dart';
 import 'alamat_list.dart';
 
 class CheckoutPage extends StatefulWidget {
@@ -21,6 +20,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   String? selectedCourier;
   String userName = "";
   String userAddress = "";
+  String userPhone = "";
 
   final formatCurrency = NumberFormat.currency(
     locale: 'id_ID',
@@ -37,30 +37,24 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Future<void> _loadUser() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getInt('userId');
+    try {
+      final addresses = await AuthService().getAddresses();
+      if (addresses.isNotEmpty) {
+        final primary = addresses.firstWhere(
+          (addr) => addr['utama'] == true,
+          orElse: () => addresses.first,
+        );
 
-    if (userId == null) return;
-
-    final userMap = dummyAccounts.firstWhere(
-      (u) => u['id'] == userId,
-      orElse: () => <String, dynamic>{},
-    );
-
-    if (userMap.isEmpty) return;
-
-    final loadedUser = User.fromMap(
-      userMap,
-    ); // ✅ pakai nama variabel beda jika perlu
-
-    setState(() {
-      userName = loadedUser.name;
-      if (loadedUser.addresses.isNotEmpty) {
-        // ✨ Perbaikan agar tidak error isPrimary
-        final defaultAddress = loadedUser.addresses.first;
-        userAddress = defaultAddress.address;
+        setState(() {
+          userName = primary['nama'] ?? '';
+          userPhone = primary['telepon'] ?? '';
+          userAddress =
+              "${primary['alamat'] ?? ''}, ${primary['kota'] ?? ''} ${primary['kodePos'] ?? ''}";
+        });
       }
-    });
+    } catch (e) {
+      print('Gagal memuat data alamat: $e');
+    }
   }
 
   List<String> _generateDateRange(int days) {
@@ -197,7 +191,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   Widget build(BuildContext context) {
     double totalPrice = widget.selectedItems.fold(
       0,
-      (sum, item) => sum + (item['price'] as double),
+      (sum, item) => sum + ((item['price'] as num) * (item['quantity'] ?? 1)),
     );
 
     return Scaffold(
@@ -260,6 +254,14 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   ),
                 ),
                 const SizedBox(height: 4),
+                Text(
+                  userPhone,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color.fromARGB(255, 40, 40, 40),
+                  ),
+                ),
+                const SizedBox(height: 4),
                 Text(userAddress, style: const TextStyle(fontSize: 14)),
               ],
             ),
@@ -274,7 +276,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
               if (selected != null && mounted) {
                 setState(() {
-                  userAddress = selected['address'] ?? userAddress;
+                  userName = selected['nama'] ?? userName;
+                  userPhone = selected['telepon'] ?? userPhone;
+                  userAddress =
+                      "${selected['alamat'] ?? ''}, ${selected['kota'] ?? ''} ${selected['kodePos'] ?? ''}";
                 });
               }
             },
@@ -286,49 +291,63 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   Widget _buildProductSummary() {
     return Column(
-      children:
-          widget.selectedItems.map((item) {
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.asset(
-                      item['image'] ?? 'assets/images/placeholder.png',
-                      width: 50,
-                      height: 50,
-                      fit: BoxFit.cover,
-                    ),
+      children: List.generate(widget.selectedItems.length, (index) {
+        final item = widget.selectedItems[index];
+
+        return Column(
+          children: [
+            Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    item['image'] ?? '',
+                    width: 50,
+                    height: 50,
+                    fit: BoxFit.cover,
+                    errorBuilder:
+                        (_, __, ___) => const Icon(Icons.broken_image),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item['name'] ?? '',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item['name'] ?? '',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          formatCurrency.format(item['price']),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.red,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        formatCurrency.format(item['price']),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        "Qty: ${item['quantity'] ?? 1}",
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            );
-          }).toList(),
+                ),
+              ],
+            ),
+            if (index != widget.selectedItems.length - 1)
+              const Divider(thickness: 1, height: 20),
+          ],
+        );
+      }),
     );
   }
 
@@ -343,8 +362,15 @@ class _CheckoutPageState extends State<CheckoutPage> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF003333),
-          borderRadius: BorderRadius.circular(8),
+          color: Colors.grey.shade900, // Warna dasar modern (dark grey)
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
         child: Row(
           children: [
@@ -356,24 +382,31 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     "Estimasi tiba: $estDate",
                     style: const TextStyle(
                       color: Colors.white,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Text(
                     selectedCourier != null
                         ? "Pengiriman ${selectedCourier!}"
                         : "Pilih Pengiriman",
-                    style: const TextStyle(color: Colors.white),
+                    style: TextStyle(color: Colors.grey.shade300, fontSize: 14),
                   ),
                 ],
               ),
             ),
             Row(
               children: const [
-                Icon(Icons.local_shipping, color: Colors.cyan),
-                SizedBox(width: 4),
-                Text("Gratis", style: TextStyle(color: Colors.cyan)),
+                Icon(Icons.local_shipping_outlined, color: Color(0xFF00FFB0)),
+                SizedBox(width: 6),
+                Text(
+                  "Gratis",
+                  style: TextStyle(
+                    color: Color(0xFF00FFB0),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ],
             ),
           ],
@@ -397,8 +430,15 @@ class _CheckoutPageState extends State<CheckoutPage> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF003333),
-          borderRadius: BorderRadius.circular(8),
+          color: Colors.grey.shade900, // dark theme
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -410,17 +450,22 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   paymentText,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   "Klik untuk pilih metode",
-                  style: TextStyle(color: Colors.white70),
+                  style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
                 ),
               ],
             ),
-            const Icon(Icons.arrow_drop_down, color: Colors.white),
+            const Icon(
+              Icons.arrow_drop_down,
+              color: Color(0xFF00FFB0), // match accent color
+              size: 28,
+            ),
           ],
         ),
       ),
@@ -473,7 +518,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 );
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
+                backgroundColor: const Color.fromARGB(255, 0, 0, 0),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),

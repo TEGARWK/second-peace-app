@@ -3,10 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:animate_do/animate_do.dart';
 import '../providers/cart_provider.dart';
 import 'checkout_page.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'detail_page.dart';
 import '../models/product.dart';
-import '../data/dummy_accounts.dart';
-import '../data/dummy_products.dart'; // ⬅️ Tambahan ini penting
 import 'package:intl/intl.dart';
 
 class CartPage extends StatefulWidget {
@@ -20,53 +18,9 @@ class _CartPageState extends State<CartPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final prefs = await SharedPreferences.getInstance();
-      final userId = prefs.getInt('userId');
-
-      if (userId != null) {
-        final user = dummyAccounts.firstWhere(
-          (acc) => acc['id'] == userId,
-          orElse: () => {},
-        );
-
-        if (user.isNotEmpty && user.containsKey('cart')) {
-          final cartProvider = Provider.of<CartProvider>(
-            context,
-            listen: false,
-          );
-
-          final userCart = List<Map<String, dynamic>>.from(user['cart']);
-
-          final detailedCart =
-              userCart.map((cartItem) {
-                final product = dummyProducts.firstWhere(
-                  (prod) => prod.id == cartItem['productId'],
-                  orElse:
-                      () => Product(
-                        id: 0,
-                        name: 'Produk tidak ditemukan',
-                        description: '',
-                        price: 0.0,
-                        stock: 0,
-                        size: '',
-                        imageUrl: 'assets/images/placeholder.png',
-                      ),
-                );
-
-                return {
-                  'productId': cartItem['productId'],
-                  'name': product.name,
-                  'price': product.price,
-                  'image': product.imageUrl ?? 'assets/images/placeholder.png',
-                  'quantity': cartItem['quantity'],
-                  'selected': cartItem['selected'] ?? false,
-                };
-              }).toList();
-
-          cartProvider.setItems(detailedCart);
-        }
-      }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final cartProvider = Provider.of<CartProvider>(context, listen: false);
+      cartProvider.fetchCart();
     });
   }
 
@@ -116,13 +70,19 @@ class _CartPageState extends State<CartPage> {
                             itemCount: cartProvider.items.length,
                             itemBuilder: (context, index) {
                               final item = cartProvider.items[index];
+                              final produk = item['produk'];
+                              final imageUrl =
+                                  produk['gambar'] != null
+                                      ? 'http://192.168.1.4:8000/uploads/${produk['gambar']}'
+                                      : null;
+
                               return FadeInUp(
                                 duration: const Duration(milliseconds: 300),
                                 child: Dismissible(
-                                  key: Key(item['name'] ?? 'item-$index'),
+                                  key: Key(item['id'].toString()),
                                   direction: DismissDirection.endToStart,
-                                  onDismissed: (direction) {
-                                    cartProvider.removeItem(index);
+                                  onDismissed: (direction) async {
+                                    await cartProvider.removeItem(item['id']);
                                   },
                                   background: Container(
                                     alignment: Alignment.centerRight,
@@ -145,25 +105,57 @@ class _CartPageState extends State<CartPage> {
                                       borderRadius: BorderRadius.circular(15),
                                     ),
                                     child: ListTile(
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder:
+                                                (_) => DetailPage(
+                                                  product: Product(
+                                                    id: produk['id_produk'],
+                                                    name: produk['nama_produk'],
+                                                    description:
+                                                        produk['deskripsi'],
+                                                    price:
+                                                        (produk['harga'] as num)
+                                                            .toDouble(),
+                                                    stock: produk['stok'],
+                                                    size: produk['size'],
+                                                    imageUrl: imageUrl,
+                                                  ),
+                                                  relatedProducts: const [],
+                                                ),
+                                          ),
+                                        );
+                                      },
                                       leading: ClipRRect(
                                         borderRadius: BorderRadius.circular(10),
-                                        child: Image.asset(
-                                          item['image'] ??
-                                              'assets/images/placeholder.png',
-                                          width: 60,
-                                          height: 60,
-                                          fit: BoxFit.cover,
-                                        ),
+                                        child:
+                                            imageUrl != null
+                                                ? Image.network(
+                                                  imageUrl,
+                                                  width: 60,
+                                                  height: 60,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder:
+                                                      (_, __, ___) =>
+                                                          const Icon(
+                                                            Icons.broken_image,
+                                                          ),
+                                                )
+                                                : const Icon(
+                                                  Icons.broken_image,
+                                                ),
                                       ),
                                       title: Text(
-                                        item['name'] ?? 'Produk',
+                                        produk['nama_produk'] ?? 'Produk',
                                         style: const TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                       subtitle: Text(
-                                        formatRupiah(item['price'] ?? 0),
+                                        formatRupiah(produk['harga'] ?? 0),
                                         style: const TextStyle(
                                           fontSize: 14,
                                           color: Colors.red,
@@ -238,7 +230,6 @@ class _CartPageState extends State<CartPage> {
                   ),
                   Text(
                     formatRupiah(cartProvider.getTotalPrice()),
-
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -262,7 +253,20 @@ class _CartPageState extends State<CartPage> {
               final selectedItems =
                   cartProvider.items
                       .where((item) => item['selected'] ?? false)
+                      .map(
+                        (item) => {
+                          'id': item['id'],
+                          'name': item['produk']['nama_produk'] ?? 'Produk',
+                          'price': (item['produk']['harga'] ?? 0),
+                          'quantity': item['jumlah'] ?? 1,
+                          'image':
+                              item['produk']['gambar'] != null
+                                  ? 'http://192.168.1.4:8000/uploads/${item['produk']['gambar']}'
+                                  : null,
+                        },
+                      )
                       .toList();
+
               if (selectedItems.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(

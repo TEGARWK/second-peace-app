@@ -5,13 +5,27 @@ import 'package:secondpeacem/screens/orders_page.dart';
 import 'package:secondpeacem/screens/account_page.dart';
 import 'package:secondpeacem/widgets/custom_navbar.dart';
 import 'package:secondpeacem/providers/cart_provider.dart';
-import 'package:secondpeacem/data/dummy_products.dart';
+import 'package:secondpeacem/services/cart_service.dart'; // Tambahkan ini
 import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final prefs = await SharedPreferences.getInstance();
+  final token =
+      prefs.getString('token') ?? ''; // Pastikan token disimpan sebelumnya
+  final cartService = CartService(
+    baseUrl: 'http://127.0.0.1:8000/api',
+    token: token,
+  );
+
   runApp(
     MultiProvider(
-      providers: [ChangeNotifierProvider(create: (_) => CartProvider())],
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) => CartProvider(cartService: cartService),
+        ),
+      ],
       child: const SecondPeaceApp(),
     ),
   );
@@ -44,6 +58,8 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
 
+  final List<Widget> _pages = const [HomePage(), OrdersPage(), AccountPage()];
+
   @override
   void initState() {
     super.initState();
@@ -57,12 +73,6 @@ class _MainScreenState extends State<MainScreen> {
       prefs.remove('navIndex');
     });
   }
-
-  final List<Widget> _pages = [
-    HomePage(products: dummyProducts),
-    const OrdersPage(),
-    const AccountPage(),
-  ];
 
   void _onItemTapped(int index) {
     setState(() {
@@ -88,7 +98,7 @@ class _MainScreenState extends State<MainScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
-        backgroundColor: const Color.fromARGB(255, 0, 0, 0),
+        backgroundColor: Colors.black,
         selectedItemColor: Colors.white,
         unselectedItemColor: Colors.grey,
         items: const [

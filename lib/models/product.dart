@@ -29,7 +29,20 @@ class Product {
               : map['price'] ?? 0.0,
       stock: map['stock'] ?? 0,
       size: map['size'],
-      imageUrl: map['image'], // pakai 'image' dari assets
+      imageUrl: map['image'],
+    );
+  }
+
+  /// Digunakan untuk data dari API Laravel
+  factory Product.fromJson(Map<String, dynamic> json) {
+    return Product(
+      id: json['id'],
+      name: json['nama'], // sesuai API Laravel
+      description: json['deskripsi'] ?? '',
+      price: (json['harga'] as num).toDouble(),
+      stock: json['stok'] ?? 0,
+      size: json['size'],
+      imageUrl: json['gambar'],
     );
   }
 

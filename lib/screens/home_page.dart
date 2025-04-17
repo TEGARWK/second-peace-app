@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
-import 'package:secondpeacem/data/dummy_products.dart';
-import 'package:secondpeacem/models/product.dart';
 import 'package:intl/intl.dart';
+import '../models/product.dart';
+import '../services/product_service.dart';
 import 'detail_page.dart';
 
 class HomePage extends StatefulWidget {
-  final List<Product> products;
-
-  const HomePage({super.key, required this.products});
+  const HomePage({super.key});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -22,6 +19,7 @@ class _HomePageState extends State<HomePage> {
     'aksesoris',
   ];
 
+  late Future<List<Product>> _futureProducts;
   late ScrollController _scrollController;
   bool _showCategories = true;
   double _lastOffset = 0.0;
@@ -30,23 +28,15 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _scrollController = ScrollController();
+    _futureProducts = ProductService().fetchProducts();
 
     _scrollController.addListener(() {
       double currentOffset = _scrollController.offset;
-
-      // Deteksi arah scroll manual
       if (currentOffset > _lastOffset && _showCategories) {
-        // Scroll ke bawah, sembunyikan kategori
-        setState(() {
-          _showCategories = false;
-        });
+        setState(() => _showCategories = false);
       } else if (currentOffset < _lastOffset && !_showCategories) {
-        // Scroll ke atas, tampilkan kategori
-        setState(() {
-          _showCategories = true;
-        });
+        setState(() => _showCategories = true);
       }
-
       _lastOffset = currentOffset;
     });
   }
@@ -74,8 +64,9 @@ class _HomePageState extends State<HomePage> {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: CustomScrollView(
+          controller: _scrollController,
           slivers: [
-            // Search Bar dan tombol kategori
+            // Search & Kategori Button
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -99,9 +90,7 @@ class _HomePageState extends State<HomePage> {
                     const SizedBox(width: 12),
                     GestureDetector(
                       onTap: () {
-                        setState(() {
-                          _showCategories = !_showCategories;
-                        });
+                        setState(() => _showCategories = !_showCategories);
                       },
                       child: Container(
                         padding: const EdgeInsets.all(10),
@@ -123,7 +112,7 @@ class _HomePageState extends State<HomePage> {
                 duration: const Duration(milliseconds: 300),
                 switchInCurve: Curves.easeInOut,
                 switchOutCurve: Curves.easeInOut,
-                transitionBuilder: (Widget child, Animation<double> animation) {
+                transitionBuilder: (child, animation) {
                   final offsetAnimation = Tween<Offset>(
                     begin: const Offset(0, -0.2),
                     end: Offset.zero,
@@ -139,9 +128,7 @@ class _HomePageState extends State<HomePage> {
                 child:
                     _showCategories
                         ? Padding(
-                          key: const ValueKey(
-                            true,
-                          ), // Important for AnimatedSwitcher
+                          key: const ValueKey(true),
                           padding: const EdgeInsets.only(top: 8, left: 16),
                           child: SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
@@ -182,21 +169,50 @@ class _HomePageState extends State<HomePage> {
 
             const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
-            // Produk grid
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              sliver: SliverGrid(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) =>
-                      _buildProductItem(context, dummyProducts[index]),
-                  childCount: dummyProducts.length,
-                ),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: screenWidth > 600 ? 3 : 2,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: 0.75,
-                ),
+            // Produk Grid dari API
+            SliverToBoxAdapter(
+              child: FutureBuilder<List<Product>>(
+                future: _futureProducts,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.all(40),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  } else if (snapshot.hasError) {
+                    return Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Center(
+                        child: Text('Gagal memuat produk: ${snapshot.error}'),
+                      ),
+                    );
+                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Center(child: Text('Tidak ada produk.')),
+                    );
+                  }
+
+                  final products = snapshot.data!;
+                  return GridView.builder(
+                    physics: const NeverScrollableScrollPhysics(),
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: products.length,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: screenWidth > 600 ? 3 : 2,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      childAspectRatio: 0.75,
+                    ),
+                    itemBuilder:
+                        (context, index) => _buildProductItem(
+                          context,
+                          products[index],
+                          products,
+                        ),
+                  );
+                },
               ),
             ),
           ],
@@ -205,25 +221,22 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildProductItem(BuildContext context, Product product) {
+  Widget _buildProductItem(
+    BuildContext context,
+    Product product,
+    List<Product> related,
+  ) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           PageRouteBuilder(
             pageBuilder:
-                (context, animation, secondaryAnimation) => DetailPage(
-                  product: product,
-                  relatedProducts: dummyProducts,
-                ),
-            transitionsBuilder: (
-              context,
-              animation,
-              secondaryAnimation,
-              child,
-            ) {
-              return FadeTransition(opacity: animation, child: child);
-            },
+                (_, __, ___) =>
+                    DetailPage(product: product, relatedProducts: related),
+            transitionsBuilder:
+                (_, anim, __, child) =>
+                    FadeTransition(opacity: anim, child: child),
           ),
         );
       },
@@ -280,13 +293,12 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildProductImage(Product product) {
     final imagePath = product.imageUrl ?? '';
-
     if (imagePath.startsWith('http')) {
       return Image.network(
         imagePath,
         fit: BoxFit.cover,
         errorBuilder:
-            (context, error, stackTrace) => Container(
+            (_, __, ___) => Container(
               color: Colors.grey[300],
               child: const Icon(Icons.broken_image, size: 50),
             ),
@@ -296,7 +308,7 @@ class _HomePageState extends State<HomePage> {
         imagePath.isNotEmpty ? imagePath : 'assets/placeholder.png',
         fit: BoxFit.cover,
         errorBuilder:
-            (context, error, stackTrace) => Container(
+            (_, __, ___) => Container(
               color: Colors.grey[300],
               child: const Icon(Icons.broken_image, size: 50),
             ),

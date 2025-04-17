@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-
-import 'package:secondpeacem/data/dummy_accounts.dart';
 import 'package:secondpeacem/main.dart';
+import 'package:secondpeacem/services/auth_service.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -14,6 +13,7 @@ class RegisterPage extends StatefulWidget {
 
 class _RegisterPageState extends State<RegisterPage> {
   final nameController = TextEditingController();
+  final usernameController = TextEditingController();
   final emailController = TextEditingController();
   final phoneController = TextEditingController();
   final passwordController = TextEditingController();
@@ -32,15 +32,17 @@ class _RegisterPageState extends State<RegisterPage> {
       _isLoading = true;
     });
 
-    final name = nameController.text.trim();
+    final nama = nameController.text.trim();
+    final username = usernameController.text.trim();
     final email = emailController.text.trim();
-    final phone = phoneController.text.trim();
+    final noTelepon = phoneController.text.trim();
     final password = passwordController.text;
     final confirmPassword = confirmPasswordController.text;
 
-    if (name.isEmpty ||
+    if (nama.isEmpty ||
+        username.isEmpty ||
         email.isEmpty ||
-        phone.isEmpty ||
+        noTelepon.isEmpty ||
         password.isEmpty ||
         confirmPassword.isEmpty) {
       setState(() {
@@ -58,38 +60,44 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
-    final isExist = dummyAccounts.any((user) => user['email'] == email);
-    if (isExist) {
-      setState(() {
-        errorMessage = "Email sudah terdaftar.";
-        _isLoading = false;
-      });
-      return;
-    }
-
-    final newUserId = dummyAccounts.length + 1;
-
-    dummyAccounts.add({
-      'id': newUserId,
-      'name': name,
-      'email': email,
-      'phone': phone,
-      'password': password,
-      'addresses': [],
-    });
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isLoggedIn', true);
-    await prefs.setInt('userId', newUserId);
-    await prefs.setString('userName', name);
-    await prefs.setString('userEmail', email);
-
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MainScreen()),
+    try {
+      final response = await AuthService().registerUser(
+        nama: nama,
+        username: username,
+        email: email,
+        noTelepon: noTelepon,
+        password: password,
       );
+
+      if (response['success'] == true) {
+        final user = response['user'];
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('isLoggedIn', true);
+        await prefs.setInt('userId', user['id']);
+        await prefs.setString('userName', user['nama']);
+        await prefs.setString('userEmail', user['email']);
+        await prefs.setString('userPhone', user['no_telepon']);
+
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const MainScreen()),
+          );
+        }
+      } else {
+        setState(() {
+          errorMessage = response['message'] ?? "Registrasi gagal.";
+        });
+      }
+    } catch (e) {
+      setState(() {
+        errorMessage = "Terjadi kesalahan: ${e.toString()}";
+      });
     }
+
+    setState(() {
+      _isLoading = false;
+    });
   }
 
   Future<void> _loginWithGoogle() async {
@@ -168,6 +176,11 @@ class _RegisterPageState extends State<RegisterPage> {
                 hintText: "Nama Lengkap",
               ),
               const SizedBox(height: 16),
+              buildTextField(
+                controller: usernameController,
+                hintText: "Username",
+              ),
+              const SizedBox(height: 16),
               buildTextField(controller: emailController, hintText: "Email"),
               const SizedBox(height: 16),
               buildTextField(
@@ -241,10 +254,7 @@ class _RegisterPageState extends State<RegisterPage> {
               const SizedBox(height: 24),
               ElevatedButton.icon(
                 onPressed: _loginWithGoogle,
-                icon: Image.asset(
-                  "assets/google.png",
-                  height: 24,
-                ), // Pastikan file ini ada
+                icon: Image.asset("assets/google.png", height: 24),
                 label: const Text("Continue With Google"),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFF0F0F0),

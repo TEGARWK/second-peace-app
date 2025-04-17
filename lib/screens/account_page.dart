@@ -21,6 +21,7 @@ class _AccountPageState extends State<AccountPage> {
   bool isLoggedIn = false;
   String? userName;
   String? userEmail;
+  String? userPhone;
 
   // Map status pesanan dan jumlahnya
   Map<String, int> orderCounts = {
@@ -41,19 +42,23 @@ class _AccountPageState extends State<AccountPage> {
     bool loggedIn = prefs.getBool('isLoggedIn') ?? false;
     String? email = prefs.getString('userEmail');
     String? name = prefs.getString('userName');
+    String? phone = prefs.getString('userPhone');
 
     if (loggedIn && email != null) {
       setState(() {
         isLoggedIn = true;
         userName = name ?? "User";
         userEmail = email;
+        userPhone = phone ?? "-";
       });
+
       _fetchOrderCounts(); // fetch order setelah login
     } else {
       setState(() {
         isLoggedIn = false;
-        userName = null;
-        userEmail = null;
+        userName = name ?? "User";
+        userEmail = email;
+        userPhone = phone ?? "-";
       });
     }
   }
@@ -73,6 +78,7 @@ class _AccountPageState extends State<AccountPage> {
       isLoggedIn = false;
       userName = null;
       userEmail = null;
+      userPhone = null;
     });
 
     // Redirect ke homepage (index 0)
@@ -151,6 +157,14 @@ class _AccountPageState extends State<AccountPage> {
                       if (isLoggedIn)
                         Text(
                           userEmail ?? "-",
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                        ),
+                      if (isLoggedIn)
+                        Text(
+                          userPhone ?? "-",
                           style: const TextStyle(
                             color: Colors.white70,
                             fontSize: 14,

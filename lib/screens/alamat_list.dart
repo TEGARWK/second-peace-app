@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../data/dummy_accounts.dart';
+import '../services/auth_service.dart';
 import 'alamat_pengiriman_page.dart';
 
 class DaftarAlamatPage extends StatefulWidget {
@@ -12,7 +11,6 @@ class DaftarAlamatPage extends StatefulWidget {
 
 class _DaftarAlamatPageState extends State<DaftarAlamatPage> {
   List<Map<String, dynamic>> alamatUser = [];
-  int? userId;
 
   @override
   void initState() {
@@ -21,31 +19,59 @@ class _DaftarAlamatPageState extends State<DaftarAlamatPage> {
   }
 
   Future<void> _loadAlamatUser() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    userId = prefs.getInt('userId');
-
-    if (userId != null) {
-      final user = dummyAccounts.firstWhere(
-        (acc) => acc['id'] == userId,
-        orElse: () => {},
-      );
-
+    try {
+      final addresses = await AuthService().getAddresses();
       setState(() {
-        alamatUser = List<Map<String, dynamic>>.from(user['addresses'] ?? []);
+        alamatUser = addresses;
+      });
+    } catch (e) {
+      print('Gagal memuat alamat: $e');
+      setState(() {
+        alamatUser = [];
       });
     }
   }
 
-  void _setAsPrimary(int index) async {
-    setState(() {
-      for (var i = 0; i < alamatUser.length; i++) {
-        alamatUser[i]['isPrimary'] = (i == index);
-      }
-    });
+  Future<void> _setAsPrimary(int id) async {
+    try {
+      final result = await AuthService().setPrimaryAddress(id);
+      if (result['success'] == true) {
+        // Ambil alamat terbaru setelah update
+        final newList = await AuthService().getAddresses();
+        final primary = newList.firstWhere(
+          (a) => a['utama'] == true,
+          orElse: () => {},
+        );
 
-    if (userId != null) {
-      final user = dummyAccounts.firstWhere((u) => u['id'] == userId);
-      user['addresses'] = alamatUser;
+        // Kirim balik ke halaman sebelumnya (CheckoutPage)
+        Navigator.pop(context, primary);
+      }
+    } catch (e) {
+      print("Gagal set utama: $e");
+    }
+  }
+
+  Future<void> _hapusAlamat(int id) async {
+    try {
+      final result = await AuthService().deleteAddress(id);
+      print("DELETE RESPONSE: $result");
+      if (result['success'] == true) {
+        _loadAlamatUser();
+      }
+    } catch (e) {
+      print("Gagal hapus alamat: $e");
+    }
+  }
+
+  Future<void> _bukaFormAlamat({Map<String, dynamic>? existingData}) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AlamatPengirimanPage(existingData: existingData),
+      ),
+    );
+    if (result == true) {
+      _loadAlamatUser();
     }
   }
 
@@ -58,7 +84,7 @@ class _DaftarAlamatPageState extends State<DaftarAlamatPage> {
           style: TextStyle(color: Colors.white),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
-        backgroundColor: const Color.fromARGB(255, 0, 0, 0),
+        backgroundColor: Colors.black,
       ),
       body:
           alamatUser.isEmpty
@@ -68,7 +94,7 @@ class _DaftarAlamatPageState extends State<DaftarAlamatPage> {
                 itemCount: alamatUser.length,
                 itemBuilder: (context, index) {
                   final alamat = alamatUser[index];
-                  final isPrimary = alamat['isPrimary'] == true;
+                  final isPrimary = alamat['utama'] == true;
 
                   return Card(
                     shape: RoundedRectangleBorder(
@@ -81,13 +107,14 @@ class _DaftarAlamatPageState extends State<DaftarAlamatPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Header Nama dan Label Utama
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Row(
                                 children: [
                                   Text(
-                                    alamat['label'],
+                                    alamat['nama'] ?? '',
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
@@ -115,61 +142,55 @@ class _DaftarAlamatPageState extends State<DaftarAlamatPage> {
                                     ),
                                 ],
                               ),
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.pop(context, alamat);
+                                },
+                                child: const Text(
+                                  'Gunakan',
+                                  style: TextStyle(color: Colors.black),
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 8),
-                          Text(alamat['address']),
+                          Text(
+                            '${alamat['alamat']}, ${alamat['kota']} ${alamat['kodePos']}',
+                          ),
                           const Divider(height: 20),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                'Alamat ${index + 1}',
+                                alamat['telepon'] ?? '',
                                 style: const TextStyle(
                                   fontSize: 14,
                                   color: Colors.grey,
                                 ),
                               ),
-                              if (isPrimary)
-                                const Text(
-                                  'Alamat Utama',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.green,
-                                  ),
-                                ),
                               Row(
                                 children: [
                                   if (!isPrimary)
                                     TextButton(
-                                      onPressed: () => _setAsPrimary(index),
+                                      onPressed:
+                                          () => _setAsPrimary(alamat['id']),
                                       child: const Text(
                                         'Set Utama',
                                         style: TextStyle(color: Colors.green),
                                       ),
                                     ),
                                   TextButton(
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder:
-                                              (_) =>
-                                                  const AlamatPengirimanPage(),
+                                    onPressed:
+                                        () => _bukaFormAlamat(
+                                          existingData: alamat,
                                         ),
-                                      );
-                                    },
                                     child: const Text(
                                       'Edit',
                                       style: TextStyle(color: Colors.blue),
                                     ),
                                   ),
                                   TextButton(
-                                    onPressed: () {
-                                      setState(() {
-                                        alamatUser.removeAt(index);
-                                      });
-                                    },
+                                    onPressed: () => _hapusAlamat(alamat['id']),
                                     child: const Text(
                                       'Hapus',
                                       style: TextStyle(color: Colors.red),
@@ -186,13 +207,8 @@ class _DaftarAlamatPageState extends State<DaftarAlamatPage> {
                 },
               ),
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color.fromARGB(255, 0, 0, 0),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const AlamatPengirimanPage()),
-          );
-        },
+        backgroundColor: Colors.black,
+        onPressed: () => _bukaFormAlamat(),
         label: const Text(
           'Tambah Alamat',
           style: TextStyle(color: Colors.white),

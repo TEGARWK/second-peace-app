@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../data/dummy_accounts.dart';
+import 'package:secondpeacem/services/auth_service.dart';
 import 'register_page.dart';
 import 'package:secondpeacem/main.dart';
+import 'package:provider/provider.dart';
+import 'package:secondpeacem/providers/cart_provider.dart';
+import 'package:secondpeacem/services/cart_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -24,35 +27,63 @@ class _LoginPageState extends State<LoginPage> {
       errorMessage = null;
     });
 
-    await Future.delayed(const Duration(milliseconds: 500));
-
     final email = emailController.text.trim();
     final password = passwordController.text;
 
-    final matchedUser = dummyAccounts.firstWhere(
-      (user) => user['email'] == email && user['password'] == password,
-      orElse: () => {},
-    );
-
-    if (matchedUser.containsKey('id')) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isLoggedIn', true);
-      await prefs.setInt('userId', matchedUser['id']);
-      await prefs.setString('userName', matchedUser['name']);
-      await prefs.setString('userEmail', matchedUser['email']);
-
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const MainScreen()),
-        );
-      }
-    } else {
+    if (email.isEmpty || password.isEmpty) {
       setState(() {
-        errorMessage = "Email atau password salah.";
+        errorMessage = "Email dan password wajib diisi.";
         _isLoading = false;
       });
+      return;
     }
+
+    try {
+      final response = await AuthService().loginUser(
+        email: email,
+        password: password,
+      );
+
+      if (response['success'] == true) {
+        final user = response['user'];
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('isLoggedIn', true);
+        await prefs.setInt('userId', user['id']);
+        await prefs.setString('userName', user['nama']);
+        await prefs.setString('userEmail', user['email']);
+        await prefs.setString('userPhone', user['no_telepon']);
+
+        // 🔥 Injeksi ulang CartService ke CartProvider
+        final token = response['token'];
+        final cartService = CartService(
+          baseUrl: 'http://192.168.1.4:8000/api',
+          token: token,
+        );
+
+        Provider.of<CartProvider>(context, listen: false).setCartService =
+            cartService;
+        await Provider.of<CartProvider>(context, listen: false).fetchCart();
+
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const MainScreen()),
+          );
+        }
+      } else {
+        setState(() {
+          errorMessage = response['message'] ?? "Login gagal.";
+        });
+      }
+    } catch (e) {
+      setState(() {
+        errorMessage = "Terjadi kesalahan: ${e.toString()}";
+      });
+    }
+
+    setState(() {
+      _isLoading = false;
+    });
   }
 
   @override
@@ -71,7 +102,7 @@ class _LoginPageState extends State<LoginPage> {
   }) {
     return TextField(
       controller: controller,
-      obscureText: obscureText,
+      obscureText: isPassword && obscureText,
       decoration: InputDecoration(
         hintText: hint,
         filled: true,
@@ -116,9 +147,7 @@ class _LoginPageState extends State<LoginPage> {
                   "Back",
                   style: TextStyle(color: Colors.black, fontSize: 16),
                 ),
-                style: TextButton.styleFrom(foregroundColor: Colors.black),
               ),
-
               const Text(
                 'LogIn',
                 style: TextStyle(fontSize: 50, fontWeight: FontWeight.bold),
@@ -190,11 +219,12 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               const SizedBox(height: 40),
-              // Google Login
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    // TODO: Google login
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.grey[200],
                     elevation: 0,
