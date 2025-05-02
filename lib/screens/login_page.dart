@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:secondpeacem/services/auth_service.dart';
-import 'register_page.dart';
-import 'package:secondpeacem/main.dart';
 import 'package:provider/provider.dart';
 import 'package:secondpeacem/providers/cart_provider.dart';
 import 'package:secondpeacem/services/cart_service.dart';
@@ -45,30 +43,25 @@ class _LoginPageState extends State<LoginPage> {
       );
 
       if (response['success'] == true) {
-        final user = response['user'];
+        final user = response['user'] ?? {};
+        final token = response['token'] ?? "";
+
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('isLoggedIn', true);
-        await prefs.setInt('userId', user['id']);
-        await prefs.setString('userName', user['nama']);
-        await prefs.setString('userEmail', user['email']);
-        await prefs.setString('userPhone', user['no_telepon']);
+        await prefs.setInt('userId', user['id'] ?? 0);
+        await prefs.setString('userName', user['nama'] ?? 'Pengguna');
+        await prefs.setString('userEmail', user['email'] ?? '-');
+        await prefs.setInt('navIndex', 2); // buka tab Akun
 
-        // 🔥 Injeksi ulang CartService ke CartProvider
-        final token = response['token'];
-        final cartService = CartService(
-          baseUrl: 'http://192.168.1.4:8000/api',
-          token: token,
-        );
+        Provider.of<CartProvider>(context, listen: false).updateToken(token);
 
-        Provider.of<CartProvider>(context, listen: false).setCartService =
-            cartService;
-        await Provider.of<CartProvider>(context, listen: false).fetchCart();
+        await Provider.of<CartProvider>(
+          context,
+          listen: false,
+        ).fetchCart(user['id']);
 
         if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const MainScreen()),
-          );
+          Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
         }
       } else {
         setState(() {
@@ -203,12 +196,7 @@ class _LoginPageState extends State<LoginPage> {
                     const Text("Don’t Have an Account? "),
                     GestureDetector(
                       onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const RegisterPage(),
-                          ),
-                        );
+                        Navigator.pushNamed(context, '/register');
                       },
                       child: const Text(
                         "Create Account",

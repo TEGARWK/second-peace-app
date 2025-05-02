@@ -4,26 +4,23 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
-  final String baseUrl = 'http://192.168.1.4:8000/api/auth';
+  final String baseUrl = 'http://10.0.2.2:8000/api';
 
-  // Simpan token ke SharedPreferences
   Future<void> _saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('token', token);
   }
 
-  // Ambil token dari SharedPreferences
   Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('token');
   }
 
-  // Register Pelanggan
+  // ✅ REGISTER
   Future<Map<String, dynamic>> registerUser({
     required String nama,
     required String username,
     required String email,
-    required String noTelepon,
     required String password,
   }) async {
     final response = await http.post(
@@ -36,8 +33,8 @@ class AuthService {
         'nama': nama,
         'username': username,
         'email': email,
-        'no_telepon': noTelepon,
         'password': password,
+        'password_confirmation': password,
       }),
     );
 
@@ -47,11 +44,20 @@ class AuthService {
     try {
       final data = jsonDecode(response.body);
 
-      if (response.statusCode == 200 && data['success'] == true) {
+      if (response.statusCode == 200 &&
+          data['token'] != null &&
+          data['user'] != null) {
         await _saveToken(data['token']);
-        return data;
+        return {
+          'success': true,
+          'token': data['token'],
+          'user': {
+            'id': data['user']['id'],
+            'nama': data['user']['nama'] ?? 'Pengguna',
+            'email': data['user']['email'] ?? '',
+          },
+        };
       } else {
-        // Munculkan pesan error Laravel kalau ada
         return {
           'success': false,
           'message':
@@ -68,7 +74,7 @@ class AuthService {
     }
   }
 
-  // Login Pelanggan
+  // ✅ LOGIN
   Future<Map<String, dynamic>> loginUser({
     required String email,
     required String password,
@@ -83,27 +89,38 @@ class AuthService {
     );
 
     final data = jsonDecode(response.body);
-    if (response.statusCode == 200 && data['success']) {
+
+    if (response.statusCode == 200 &&
+        data['token'] != null &&
+        data['user'] != null) {
       await _saveToken(data['token']);
+      return {
+        'success': true,
+        'token': data['token'],
+        'user': {
+          'id': data['user']['id'],
+          'nama': data['user']['nama'] ?? 'Pengguna',
+          'email': data['user']['email'] ?? '',
+        },
+      };
+    } else {
+      return {'success': false, 'message': data['message'] ?? 'Login gagal.'};
     }
-    return data;
   }
 
-  // Update Profil Pelanggan
+  // ✅ UPDATE PROFIL
   Future<Map<String, dynamic>> updateProfile({
     required int userId,
     required String nama,
     required String email,
-    required String noTelepon,
     File? foto,
   }) async {
-    final uri = Uri.parse('http://192.168.1.4:8000/api/user/update');
+    final uri = Uri.parse('$baseUrl/user/update');
     final request = http.MultipartRequest('POST', uri);
 
     request.fields['id'] = userId.toString();
     request.fields['nama'] = nama;
     request.fields['email'] = email;
-    request.fields['no_telepon'] = noTelepon;
 
     final token = await _getToken();
     if (token != null) {
@@ -121,7 +138,7 @@ class AuthService {
     return jsonDecode(response.body);
   }
 
-  // Menambahkan alamat
+  // ✅ ALAMAT: Tambah
   Future<Map<String, dynamic>> addAddress({
     required String nama,
     required String telepon,
@@ -133,7 +150,7 @@ class AuthService {
     final token = await _getToken();
 
     final response = await http.post(
-      Uri.parse('http://192.168.1.4:8000/api/user/address'),
+      Uri.parse('$baseUrl/user/address'),
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
@@ -141,10 +158,8 @@ class AuthService {
       },
       body: jsonEncode({
         'nama': nama,
-        'telepon': telepon,
+        'no_whatsapp': telepon,
         'alamat': alamat,
-        'kota': kota,
-        'kodePos': kodePos,
         'utama': utama,
       }),
     );
@@ -152,7 +167,7 @@ class AuthService {
     return jsonDecode(response.body);
   }
 
-  // Mengupdate alamat
+  // ✅ ALAMAT: Update
   Future<Map<String, dynamic>> updateAddress({
     required int id,
     required String nama,
@@ -165,7 +180,7 @@ class AuthService {
     final token = await _getToken();
 
     final response = await http.put(
-      Uri.parse('http://192.168.1.4:8000/api/user/address/$id'),
+      Uri.parse('$baseUrl/user/address/$id'),
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
@@ -173,10 +188,8 @@ class AuthService {
       },
       body: jsonEncode({
         'nama': nama,
-        'telepon': telepon,
+        'no_whatsapp': telepon,
         'alamat': alamat,
-        'kota': kota,
-        'kodePos': kodePos,
         'utama': utama,
       }),
     );
@@ -184,43 +197,95 @@ class AuthService {
     return jsonDecode(response.body);
   }
 
-  // ✅ Mengambil semua alamat user
+  // ✅ ALAMAT: Get all
   Future<List<Map<String, dynamic>>> getAddresses() async {
     final token = await _getToken();
 
     final response = await http.get(
-      Uri.parse('http://192.168.1.4:8000/api/user/addresses'),
+      Uri.parse('$baseUrl/user/addresses'),
       headers: {'Accept': 'application/json', 'Authorization': 'Bearer $token'},
     );
 
-    print('GET ADDRESSES STATUS: ${response.statusCode}');
-    print('GET ADDRESSES BODY: ${response.body}');
-
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return List<Map<String, dynamic>>.from(data['addresses']);
+      return List<Map<String, dynamic>>.from(data['alamat']);
     } else {
       throw Exception('Gagal memuat alamat');
     }
   }
 
+  // ✅ ALAMAT: Hapus
   Future<Map<String, dynamic>> deleteAddress(int id) async {
     final token = await _getToken();
 
     final response = await http.delete(
-      Uri.parse('http://192.168.1.4:8000/api/user/address/$id'),
+      Uri.parse('$baseUrl/user/address/$id'),
       headers: {'Accept': 'application/json', 'Authorization': 'Bearer $token'},
     );
 
     return jsonDecode(response.body);
   }
 
+  // ✅ ALAMAT: Set utama
   Future<Map<String, dynamic>> setPrimaryAddress(int id) async {
     final token = await _getToken();
+
     final response = await http.patch(
-      Uri.parse('http://192.168.1.4:8000/api/user/address/set-primary/$id'),
+      Uri.parse('$baseUrl/user/address/set-primary/$id'),
       headers: {'Accept': 'application/json', 'Authorization': 'Bearer $token'},
     );
+
     return jsonDecode(response.body);
+  }
+
+  // ✅ MIDTRANS
+  Future<String?> getSnapToken({required double amount}) async {
+    final token = await _getToken();
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/midtrans/token'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({'amount': amount}),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['snap_token'];
+    } else {
+      throw Exception('Gagal mendapatkan Snap Token');
+    }
+  }
+
+  // ✅ CHECKOUT
+  Future<Map<String, dynamic>> checkout(
+    List<Map<String, dynamic>> produkList, {
+    required String paymentMethod,
+    required String ekspedisi,
+  }) async {
+    final token = await _getToken();
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/checkout'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({
+        'produk': produkList,
+        'payment_method': paymentMethod,
+        'ekspedisi': ekspedisi,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Gagal checkout: ${response.body}');
+    }
   }
 }

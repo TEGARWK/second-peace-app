@@ -1,0 +1,23 @@
+[33mcommit f2a6a15e7c9fb6a8c5f898dacb9a9355407d3bc2[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdevelop[m[33m)[m
+Author: Tegar <tegarwirakesuma22@gmail.com>
+Date:   Thu Apr 17 21:26:11 2025 +0700
+
+    Initial commit
+
+[33mcommit eb2bbaa56233720f49246db2feb9b1e143c0b1fd[m[33m ([m[1;31morigin/develop[m[33m)[m
+Author: TEGARWK <tegarwirakesuma44@gmail.com>
+Date:   Wed Apr 9 20:27:14 2025 +0700
+
+    Update Project, Gatau apa aja yang udah di update
+
+[33mcommit cfb6deaf10e31f02b3583c656a6da854c5cfdeb7[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m
+Author: TEGARWK <tegarwirakesuma44@gmail.com>
+Date:   Sun Apr 6 23:05:52 2025 +0700
+
+    Update project: balik ke data dummy, penambahan fitur dan tampilan baru, masih ada bug sepertinya di bagain checkout.
+
+[33mcommit 32e160786935e76a622d16ab46c577defa7d7b81[m
+Author: TEGARWK <tegarwirakesuma44@gmail.com>
+Date:   Sat Apr 5 17:21:42 2025 +0700
+
+    Initial commit: push project Flutter

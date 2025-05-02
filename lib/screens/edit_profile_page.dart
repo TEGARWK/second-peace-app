@@ -15,7 +15,6 @@ class EditProfilePage extends StatefulWidget {
 class _EditProfilePageState extends State<EditProfilePage> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
-  final TextEditingController phoneController = TextEditingController();
   File? _selectedImage;
 
   bool isLoading = true;
@@ -33,7 +32,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
       userId = prefs.getInt('userId');
       nameController.text = prefs.getString('userName') ?? '';
       emailController.text = prefs.getString('userEmail') ?? '';
-      phoneController.text = prefs.getString('userPhone') ?? '';
       isLoading = false;
     });
   }
@@ -65,9 +63,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
   Future<void> _saveProfile() async {
     final name = nameController.text.trim();
     final email = emailController.text.trim();
-    final phone = phoneController.text.trim();
 
-    if (name.isEmpty || email.isEmpty || phone.isEmpty) {
+    if (name.isEmpty || email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Harap lengkapi semua data.")),
       );
@@ -81,7 +78,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
         userId: userId!,
         nama: name,
         email: email,
-        noTelepon: phone,
         foto: _selectedImage,
       );
 
@@ -89,7 +85,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('userName', name);
         await prefs.setString('userEmail', email);
-        await prefs.setString('userPhone', phone);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Profil berhasil diperbarui.")),
         );
@@ -110,7 +105,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
   void dispose() {
     nameController.dispose();
     emailController.dispose();
-    phoneController.dispose();
     super.dispose();
   }
 
@@ -187,13 +181,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       TextInputType.emailAddress,
                     ),
                     const SizedBox(height: 16),
-                    _buildInputCard(
-                      "No. Telepon",
-                      phoneController,
-                      Icons.phone,
-                      TextInputType.phone,
-                    ),
-                    const SizedBox(height: 30),
                     ElevatedButton.icon(
                       onPressed: _saveProfile,
                       icon: const Icon(Icons.save),

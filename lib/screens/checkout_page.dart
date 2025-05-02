@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/custom_navbar.dart';
 import '../services/auth_service.dart';
 import 'alamat_list.dart';
@@ -21,6 +20,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   String userName = "";
   String userAddress = "";
   String userPhone = "";
+  bool isProcessing = false;
 
   final formatCurrency = NumberFormat.currency(
     locale: 'id_ID',
@@ -30,13 +30,29 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   final Map<String, int> courierEstimates = {'J&T': 2, 'JNE': 3, 'SiCepat': 1};
 
+  final Map<String, String> subPaymentMap = {
+    'BCA VA': 'bca_va',
+    'BNI VA': 'bni_va',
+    'BRI VA': 'bri_va',
+    'OVO': 'ovo',
+    'Gopay': 'gopay',
+    'DANA': 'dana',
+    'ShopeePay': 'shopeepay',
+  };
+
   @override
   void initState() {
     super.initState();
-    _loadUser();
+    _loadPrimaryAddress(); // Memuat alamat pertama
   }
 
-  Future<void> _loadUser() async {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadPrimaryAddress(); // Memuat ulang jika ada perubahan alamat utama
+  }
+
+  Future<void> _loadPrimaryAddress() async {
     try {
       final addresses = await AuthService().getAddresses();
       if (addresses.isNotEmpty) {
@@ -47,13 +63,71 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
         setState(() {
           userName = primary['nama'] ?? '';
-          userPhone = primary['telepon'] ?? '';
-          userAddress =
-              "${primary['alamat'] ?? ''}, ${primary['kota'] ?? ''} ${primary['kodePos'] ?? ''}";
+          userPhone = primary['no_whatsapp'] ?? '';
+          userAddress = "${primary['alamat'] ?? ''}";
         });
       }
     } catch (e) {
-      print('Gagal memuat data alamat: $e');
+      print('❌ Gagal memuat alamat utama: $e');
+    }
+  }
+
+  String get selectedPaymentMethodKey {
+    return subPaymentMap[selectedSubPayment ?? ''] ?? '';
+  }
+
+  Future<void> _bayarSekarang(double totalHarga) async {
+    if (widget.selectedItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Tidak ada produk yang dipilih")),
+      );
+      return;
+    }
+
+    if (expandedPayment == null || selectedSubPayment == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Pilih metode pembayaran terlebih dahulu"),
+        ),
+      );
+      return;
+    }
+
+    try {
+      final List<Map<String, dynamic>> produkList =
+          widget.selectedItems.map((item) {
+            return {
+              'id_produk': item['id_produk'], // ✅ BENAR
+              'jumlah': item['quantity'],
+            };
+          }).toList();
+
+      print('[CHECKOUT DEBUG] produkList: $produkList');
+      print('[CHECKOUT DEBUG] metode: $selectedPaymentMethodKey');
+
+      final response = await AuthService().checkout(
+        produkList,
+        paymentMethod: selectedPaymentMethodKey,
+        ekspedisi: selectedCourier ?? 'J&T', // fallback default
+      );
+
+      if (response['snap_token'] != null && response['order_id'] != null) {
+        Navigator.pushNamed(
+          context,
+          '/snap',
+          arguments: {
+            'snap_token': response['snap_token'],
+            'order_id': response['order_id'],
+          },
+        );
+      } else {
+        throw Exception('Snap token/order_id tidak tersedia');
+      }
+    } catch (e) {
+      print("❌ Gagal saat checkout: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Gagal memproses pembayaran")),
+      );
     }
   }
 
@@ -103,9 +177,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             final paymentOptions = {
-              'Transfer Bank': ['BCA', 'Mandiri', 'BNI', 'BRI'],
-              'E-Wallet': ['OVO', 'Gopay', 'DANA'],
-              'QRIS': [],
+              'bank va': ['BCA VA', 'BNI VA', 'BRI VA'],
+              'ewallet': ['OVO', 'Gopay', 'DANA', 'ShopeePay'],
             };
 
             return ListView(
@@ -118,13 +191,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         ListTile(
-                          leading:
-                              entry.key == 'QRIS'
-                                  ? const Icon(Icons.qr_code_scanner)
-                                  : entry.key == 'Transfer Bank'
-                                  ? const Icon(Icons.account_balance)
-                                  : const Icon(Icons.account_balance_wallet),
-                          title: Text(entry.key),
+                          leading: const Icon(Icons.payment),
+                          title: Text(entry.key.toUpperCase()),
                           trailing:
                               entry.value.isNotEmpty
                                   ? Icon(
@@ -136,8 +204,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
                           onTap: () {
                             if (entry.value.isEmpty) {
                               setState(() {
-                                expandedPayment = 'QRIS';
-                                selectedSubPayment = null;
+                                expandedPayment = entry.key;
+                                selectedSubPayment = null; // No submethod
                               });
                               Navigator.pop(context);
                             } else {
@@ -234,55 +302,90 @@ class _CheckoutPageState extends State<CheckoutPage> {
   Widget _buildAddressBox() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(8),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  userName,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  userPhone,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color.fromARGB(255, 40, 40, 40),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(userAddress, style: const TextStyle(fontSize: 14)),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.edit, color: Colors.black54),
-            onPressed: () async {
-              final selected = await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const DaftarAlamatPage()),
-              );
+          // Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Alamat Pengiriman',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, color: Colors.black54),
+                onPressed: () async {
+                  final selected = await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const DaftarAlamatPage()),
+                  );
 
-              if (selected != null && mounted) {
-                setState(() {
-                  userName = selected['nama'] ?? userName;
-                  userPhone = selected['telepon'] ?? userPhone;
-                  userAddress =
-                      "${selected['alamat'] ?? ''}, ${selected['kota'] ?? ''} ${selected['kodePos'] ?? ''}";
-                });
-              }
-            },
+                  if (selected != null) {
+                    setState(() {
+                      userName = selected['nama'] ?? '';
+                      userPhone = selected['no_whatsapp'] ?? '';
+                      userAddress = "${selected['alamat'] ?? ''}";
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Nama penerima
+          Row(
+            children: [
+              const Icon(Icons.person_outline, size: 20, color: Colors.black54),
+              const SizedBox(width: 8),
+              Text(
+                userName,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Nomor WA
+          Row(
+            children: [
+              const Icon(Icons.phone_outlined, size: 20, color: Colors.black54),
+              const SizedBox(width: 8),
+              Text(userPhone, style: const TextStyle(fontSize: 14)),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Alamat lengkap
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.location_on_outlined,
+                size: 20,
+                color: Colors.black54,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(userAddress, style: const TextStyle(fontSize: 14)),
+              ),
+            ],
           ),
         ],
       ),
@@ -492,7 +595,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Total:',
+                'Total: ',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               Text(
@@ -509,14 +612,22 @@ class _CheckoutPageState extends State<CheckoutPage> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Pembayaran berhasil!'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              },
+              onPressed:
+                  isProcessing
+                      ? null
+                      : () async {
+                        setState(() => isProcessing = true);
+                        double totalPrice = widget.selectedItems.fold<double>(
+                          0.0,
+                          (sum, item) =>
+                              sum +
+                              ((item['price'] as num) *
+                                  (item['quantity'] ?? 1)),
+                        );
+                        await _bayarSekarang(totalPrice);
+                        setState(() => isProcessing = false);
+                      },
+
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color.fromARGB(255, 0, 0, 0),
                 padding: const EdgeInsets.symmetric(vertical: 14),

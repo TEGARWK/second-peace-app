@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'login_page.dart';
-import 'register_page.dart';
 import 'edit_profile_page.dart';
 import 'alamat_list.dart';
 import 'cart_page.dart';
@@ -21,7 +19,6 @@ class _AccountPageState extends State<AccountPage> {
   bool isLoggedIn = false;
   String? userName;
   String? userEmail;
-  String? userPhone;
 
   // Map status pesanan dan jumlahnya
   Map<String, int> orderCounts = {
@@ -42,33 +39,32 @@ class _AccountPageState extends State<AccountPage> {
     bool loggedIn = prefs.getBool('isLoggedIn') ?? false;
     String? email = prefs.getString('userEmail');
     String? name = prefs.getString('userName');
-    String? phone = prefs.getString('userPhone');
 
-    if (loggedIn && email != null) {
-      setState(() {
-        isLoggedIn = true;
-        userName = name ?? "User";
-        userEmail = email;
-        userPhone = phone ?? "-";
-      });
+    if (!mounted) return; // ✅ Tambahkan ini
 
-      _fetchOrderCounts(); // fetch order setelah login
-    } else {
-      setState(() {
-        isLoggedIn = false;
-        userName = name ?? "User";
-        userEmail = email;
-        userPhone = phone ?? "-";
-      });
+    setState(() {
+      isLoggedIn = loggedIn && email != null;
+      userName = name ?? "User";
+      userEmail = email;
+    });
+
+    if (isLoggedIn && email != null && email.isNotEmpty) {
+      _fetchOrderCounts(email);
     }
   }
 
-  Future<void> _fetchOrderCounts() async {
-    // Ganti ini dengan pemanggilan API sesungguhnya jika ada
-    final counts = await OrderService.getOrderCounts(userEmail!);
-    setState(() {
-      orderCounts = counts;
-    });
+  Future<void> _fetchOrderCounts(String email) async {
+    try {
+      final counts = await OrderService.getOrderCounts(email);
+
+      if (!mounted) return; // ✅ Tambahkan ini juga
+
+      setState(() {
+        orderCounts = counts;
+      });
+    } catch (e) {
+      debugPrint('Gagal mengambil jumlah pesanan: $e');
+    }
   }
 
   Future<void> _logout() async {
@@ -78,13 +74,12 @@ class _AccountPageState extends State<AccountPage> {
       isLoggedIn = false;
       userName = null;
       userEmail = null;
-      userPhone = null;
     });
 
     // Redirect ke homepage (index 0)
     await prefs.setInt('navIndex', 0);
     if (mounted) {
-      Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
     }
   }
 
@@ -157,14 +152,6 @@ class _AccountPageState extends State<AccountPage> {
                       if (isLoggedIn)
                         Text(
                           userEmail ?? "-",
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                          ),
-                        ),
-                      if (isLoggedIn)
-                        Text(
-                          userPhone ?? "-",
                           style: const TextStyle(
                             color: Colors.white70,
                             fontSize: 14,
@@ -391,9 +378,9 @@ class _AccountPageState extends State<AccountPage> {
         children: [
           ElevatedButton.icon(
             onPressed: () {
-              Navigator.push(
+              Navigator.pushNamed(
                 context,
-                MaterialPageRoute(builder: (_) => const LoginPage()),
+                '/login',
               ).then((_) => _checkLoginStatus());
             },
             style: ElevatedButton.styleFrom(
@@ -412,9 +399,9 @@ class _AccountPageState extends State<AccountPage> {
           const SizedBox(height: 16),
           OutlinedButton.icon(
             onPressed: () {
-              Navigator.push(
+              Navigator.pushNamed(
                 context,
-                MaterialPageRoute(builder: (_) => const RegisterPage()),
+                '/register',
               ).then((_) => _checkLoginStatus());
             },
             style: OutlinedButton.styleFrom(

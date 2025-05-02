@@ -6,6 +6,9 @@ import 'checkout_page.dart';
 import 'detail_page.dart';
 import '../models/product.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
 
 class CartPage extends StatefulWidget {
   const CartPage({super.key});
@@ -15,13 +18,27 @@ class CartPage extends StatefulWidget {
 }
 
 class _CartPageState extends State<CartPage> {
+  int? userId;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final cartProvider = Provider.of<CartProvider>(context, listen: false);
-      cartProvider.fetchCart();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadCart());
+  }
+
+  Future<void> _loadCart() async {
+    final prefs = await SharedPreferences.getInstance();
+    userId = prefs.getInt('userId');
+
+    if (userId != null) {
+      print('[CartPage] 🔄 Memuat keranjang untuk userId: $userId');
+      await Provider.of<CartProvider>(
+        context,
+        listen: false,
+      ).fetchCart(userId!);
+    } else {
+      print('[CartPage] ⚠️ userId tidak ditemukan di SharedPreferences!');
+    }
   }
 
   String formatRupiah(dynamic value) {
@@ -50,7 +67,7 @@ class _CartPageState extends State<CartPage> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              backgroundColor: const Color.fromARGB(255, 0, 0, 0),
+              backgroundColor: Colors.black,
             ),
             body:
                 cartProvider.items.isEmpty
@@ -72,17 +89,25 @@ class _CartPageState extends State<CartPage> {
                               final item = cartProvider.items[index];
                               final produk = item['produk'];
                               final imageUrl =
-                                  produk['gambar'] != null
-                                      ? 'http://192.168.1.4:8000/uploads/${produk['gambar']}'
+                                  (produk['gambar'] != null &&
+                                          produk['gambar']
+                                              .toString()
+                                              .startsWith('http'))
+                                      ? produk['gambar']
                                       : null;
 
                               return FadeInUp(
                                 duration: const Duration(milliseconds: 300),
                                 child: Dismissible(
-                                  key: Key(item['id'].toString()),
+                                  key: Key(item['id_keranjang'].toString()),
                                   direction: DismissDirection.endToStart,
                                   onDismissed: (direction) async {
-                                    await cartProvider.removeItem(item['id']);
+                                    if (userId == null) return;
+
+                                    await cartProvider.removeItem(
+                                      item['id_keranjang'],
+                                      userId!,
+                                    );
                                   },
                                   background: Container(
                                     alignment: Alignment.centerRight,
@@ -132,13 +157,33 @@ class _CartPageState extends State<CartPage> {
                                         borderRadius: BorderRadius.circular(10),
                                         child:
                                             imageUrl != null
-                                                ? Image.network(
-                                                  imageUrl,
+                                                ? CachedNetworkImage(
+                                                  imageUrl: imageUrl,
                                                   width: 60,
                                                   height: 60,
                                                   fit: BoxFit.cover,
-                                                  errorBuilder:
-                                                      (_, __, ___) =>
+                                                  placeholder:
+                                                      (context, url) =>
+                                                          Shimmer.fromColors(
+                                                            baseColor:
+                                                                Colors
+                                                                    .grey
+                                                                    .shade300,
+                                                            highlightColor:
+                                                                Colors
+                                                                    .grey
+                                                                    .shade100,
+                                                            child: Container(
+                                                              width: 60,
+                                                              height: 60,
+                                                              color:
+                                                                  Colors
+                                                                      .grey
+                                                                      .shade300,
+                                                            ),
+                                                          ),
+                                                  errorWidget:
+                                                      (context, url, error) =>
                                                           const Icon(
                                                             Icons.broken_image,
                                                           ),
@@ -229,7 +274,7 @@ class _CartPageState extends State<CartPage> {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   Text(
-                    formatRupiah(cartProvider.getTotalPrice()),
+                    formatRupiah(cartProvider.getTotalPrice),
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -255,14 +300,19 @@ class _CartPageState extends State<CartPage> {
                       .where((item) => item['selected'] ?? false)
                       .map(
                         (item) => {
-                          'id': item['id'],
+                          'id_produk':
+                              item['produk']['id_produk'], // ⬅️ ini yang penting
                           'name': item['produk']['nama_produk'] ?? 'Produk',
-                          'price': (item['produk']['harga'] ?? 0),
+                          'price': item['produk']['harga'] ?? 0,
                           'quantity': item['jumlah'] ?? 1,
                           'image':
-                              item['produk']['gambar'] != null
-                                  ? 'http://192.168.1.4:8000/uploads/${item['produk']['gambar']}'
-                                  : null,
+                              (() {
+                                final gambar = item['produk']['gambar'];
+                                return (gambar != null &&
+                                        gambar.toString().startsWith('http'))
+                                    ? gambar
+                                    : 'http://10.0.2.2:8000/uploads/$gambar';
+                              })(),
                         },
                       )
                       .toList();

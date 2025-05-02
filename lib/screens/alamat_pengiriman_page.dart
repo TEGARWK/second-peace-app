@@ -16,8 +16,6 @@ class _AlamatPengirimanPageState extends State<AlamatPengirimanPage> {
   late TextEditingController _namaController;
   late TextEditingController _noHpController;
   late TextEditingController _alamatLengkapController;
-  late TextEditingController _kotaController;
-  late TextEditingController _kodePosController;
 
   bool isUtama = false;
   bool isLoading = false;
@@ -29,20 +27,14 @@ class _AlamatPengirimanPageState extends State<AlamatPengirimanPage> {
       text: widget.existingData?['nama'] ?? '',
     );
     _noHpController = TextEditingController(
-      text: widget.existingData?['telepon'] ?? '',
+      text: widget.existingData?['no_whatsapp'] ?? '',
     );
     _alamatLengkapController = TextEditingController(
       text: widget.existingData?['alamat'] ?? '',
     );
-    _kotaController = TextEditingController(
-      text: widget.existingData?['kota'] ?? '',
-    );
-    _kodePosController = TextEditingController(
-      text: widget.existingData?['kodePos'] ?? '',
-    );
     isUtama =
-        widget.existingData?['utama'] == true ||
-        widget.existingData?['utama'] == 1;
+        widget.existingData?['utama'] == 1 ||
+        widget.existingData?['utama'] == true;
   }
 
   @override
@@ -50,50 +42,43 @@ class _AlamatPengirimanPageState extends State<AlamatPengirimanPage> {
     _namaController.dispose();
     _noHpController.dispose();
     _alamatLengkapController.dispose();
-    _kotaController.dispose();
-    _kodePosController.dispose();
     super.dispose();
   }
 
   Future<void> _simpanAlamat() async {
     if (_formKey.currentState!.validate()) {
-      setState(() {
-        isLoading = true;
-      });
-
-      final data = {
-        'nama': _namaController.text.trim(),
-        'telepon': _noHpController.text.trim(),
-        'alamat': _alamatLengkapController.text.trim(),
-        'kota': _kotaController.text.trim(),
-        'kodePos': _kodePosController.text.trim(),
-        'utama': isUtama,
-      };
+      setState(() => isLoading = true);
 
       try {
-        final result = await AuthService().addAddress(
-          nama: _namaController.text.trim(),
-          telepon: _noHpController.text.trim(),
-          alamat: _alamatLengkapController.text.trim(),
-          kota: _kotaController.text.trim(),
-          kodePos: _kodePosController.text.trim(),
-          utama: isUtama,
-        );
+        final result =
+            widget.existingData == null
+                ? await AuthService().addAddress(
+                  nama: _namaController.text.trim(),
+                  telepon: _noHpController.text.trim(),
+                  alamat: _alamatLengkapController.text.trim(),
+                  kota: "-", // tidak digunakan
+                  kodePos: "-", // tidak digunakan
+                  utama: isUtama,
+                )
+                : await AuthService().updateAddress(
+                  id: widget.existingData!['id_alamat'],
+                  nama: _namaController.text.trim(),
+                  telepon: _noHpController.text.trim(),
+                  alamat: _alamatLengkapController.text.trim(),
+                  kota: "-",
+                  kodePos: "-",
+                  utama: isUtama,
+                );
 
         if (result['success'] == true) {
-          Navigator.pop(
-            context,
-            true,
-          ); // balik ke halaman list & trigger reload
+          Navigator.pop(context, true);
         } else {
           _showError(result['message'] ?? 'Gagal menyimpan alamat.');
         }
       } catch (e) {
         _showError('Terjadi kesalahan saat menyimpan alamat.');
       } finally {
-        setState(() {
-          isLoading = false;
-        });
+        setState(() => isLoading = false);
       }
     }
   }
@@ -136,20 +121,14 @@ class _AlamatPengirimanPageState extends State<AlamatPengirimanPage> {
                   const SizedBox(height: 16),
                   _buildTextField("Nama Penerima", _namaController),
                   _buildTextField(
-                    "Nomor HP",
+                    "Nomor WhatsApp",
                     _noHpController,
                     keyboardType: TextInputType.phone,
                   ),
                   _buildTextField(
                     "Alamat Lengkap",
                     _alamatLengkapController,
-                    maxLines: 2,
-                  ),
-                  _buildTextField("Kota", _kotaController),
-                  _buildTextField(
-                    "Kode Pos",
-                    _kodePosController,
-                    keyboardType: TextInputType.number,
+                    maxLines: 3,
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -158,9 +137,7 @@ class _AlamatPengirimanPageState extends State<AlamatPengirimanPage> {
                         value: isUtama,
                         activeColor: Colors.green,
                         onChanged: (value) {
-                          setState(() {
-                            isUtama = value;
-                          });
+                          setState(() => isUtama = value);
                         },
                       ),
                       const SizedBox(width: 8),
@@ -176,11 +153,7 @@ class _AlamatPengirimanPageState extends State<AlamatPengirimanPage> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      icon: const Icon(
-                        Icons.save,
-                        color: Colors.white,
-                        size: 18,
-                      ),
+                      icon: const Icon(Icons.save, color: Colors.white),
                       onPressed: isLoading ? null : _simpanAlamat,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.black,

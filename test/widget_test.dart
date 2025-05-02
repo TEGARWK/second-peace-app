@@ -1,30 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:secondpeacem/main.dart'; // Sesuaikan dengan nama package di pubspec.yaml
+import 'package:secondpeacem/main.dart';
 
 void main() {
-  testWidgets('HomePage should display AppBar with title "Second Peace"', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(const SecondPeaceApp());
+  group('HomePage Widget Tests', () {
+    // Setup: render SecondPeaceApp dengan isLoggedIn false
+    Future<void> _pumpApp(WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(home: SecondPeaceApp(isLoggedIn: false)),
+      );
+    }
 
-    expect(find.text('Second Peace'), findsOneWidget);
-  });
+    testWidgets('Menampilkan AppBar dengan judul "Second Peace"', (
+      tester,
+    ) async {
+      await _pumpApp(tester);
 
-  testWidgets('HomePage should contain a search field', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(const SecondPeaceApp());
+      expect(find.text('Second Peace'), findsOneWidget);
+    });
 
-    expect(find.byType(TextField), findsOneWidget);
-    expect(find.text('Search Produk'), findsOneWidget);
-  });
+    testWidgets('Menampilkan field pencarian produk', (tester) async {
+      await _pumpApp(tester);
 
-  testWidgets('HomePage should have shopping cart button', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(const SecondPeaceApp());
+      expect(find.byType(TextField), findsOneWidget);
+      expect(
+        find.text('Search Produk'),
+        findsOneWidget,
+      ); // Ganti jika placeholder berbeda
+    });
 
-    expect(find.byIcon(Icons.shopping_cart), findsOneWidget);
+    testWidgets('Menampilkan tombol keranjang belanja', (tester) async {
+      await _pumpApp(tester);
+
+      expect(find.byIcon(Icons.shopping_cart), findsOneWidget);
+    });
   });
 }

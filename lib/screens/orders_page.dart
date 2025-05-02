@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
-import '../data/dummy_accounts.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'order_detail_unpaid_page.dart';
 import 'order_detail_processing_page.dart';
 import 'order_detail_shipped_page.dart';
@@ -34,24 +35,62 @@ class _OrdersPageState extends State<OrdersPage> with TickerProviderStateMixin {
 
   Future<void> _loadUserOrders() async {
     final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
     final userId = prefs.getInt('userId');
 
-    if (userId != null) {
-      final user = dummyAccounts.firstWhere(
-        (acc) => acc['id'] == userId,
-        orElse: () => {},
+    if (token == null || userId == null) return;
+
+    try {
+      final response = await http.get(
+        Uri.parse('http://10.0.2.2:8000/api/pesanan'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
       );
 
-      if (user.isEmpty) return;
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List orders = data['pesanan'];
 
-      final allOrders = List<Map<String, dynamic>>.from(user['orders'] ?? []);
+        setState(() {
+          unpaid =
+              orders
+                  .where((o) => o['status_pesanan'] == 'Menunggu Pembayaran')
+                  .map<Map<String, dynamic>>(
+                    (e) => Map<String, dynamic>.from(e),
+                  )
+                  .toList();
 
-      setState(() {
-        unpaid = allOrders.where((o) => o['status'] == 'Belum Bayar').toList();
-        processing = allOrders.where((o) => o['status'] == 'Diproses').toList();
-        shipped = allOrders.where((o) => o['status'] == 'Dikirim').toList();
-        received = allOrders.where((o) => o['status'] == 'Selesai').toList();
-      });
+          processing =
+              orders
+                  .where((o) => o['status_pesanan'] == 'Pembayaran Diterima')
+                  .map<Map<String, dynamic>>(
+                    (e) => Map<String, dynamic>.from(e),
+                  )
+                  .toList();
+
+          shipped =
+              orders
+                  .where((o) => o['status_pesanan'] == 'Dikirim')
+                  .map<Map<String, dynamic>>(
+                    (e) => Map<String, dynamic>.from(e),
+                  )
+                  .toList();
+
+          received =
+              orders
+                  .where((o) => o['status_pesanan'] == 'Selesai')
+                  .map<Map<String, dynamic>>(
+                    (e) => Map<String, dynamic>.from(e),
+                  )
+                  .toList();
+        });
+      } else {
+        print('Gagal memuat pesanan: ${response.body}');
+      }
+    } catch (e) {
+      print('❌ Error memuat pesanan: $e');
     }
   }
 
@@ -136,12 +175,39 @@ class _OrdersPageState extends State<OrdersPage> with TickerProviderStateMixin {
         itemCount: orders.length,
         itemBuilder: (context, index) {
           final order = orders[index];
-          final items = List<Map<String, dynamic>>.from(order['items'] ?? []);
+          final items =
+              (order['detail_pesanan'] is List)
+                  ? List<Map<String, dynamic>>.from(order['detail_pesanan'])
+                  : [];
+
+          final createdAt = order['created_at'] ?? '';
+          String formattedDate = '-';
+          try {
+            final date = DateTime.parse(createdAt);
+            formattedDate = DateFormat(
+              'd MMMM yyyy, HH:mm',
+              'id_ID',
+            ).format(date);
+            print("📅 formattedDate: $formattedDate"); // debug
+          } catch (e) {
+            print("⚠️ Gagal format tanggal: $e");
+          }
+
           final firstItem = items.isNotEmpty ? items[0] : null;
-          final totalItems = items.fold(
-            0,
-            (sum, item) => sum + (item['quantity'] ?? 0) as int,
-          );
+          final additionalCount = (items.length - 1).clamp(0, items.length);
+          final totalItems = items.fold<int>(0, (sum, item) {
+            final qty = item['jumlah'];
+            final parsedQty =
+                qty is String ? int.tryParse(qty) ?? 0 : (qty as num).toInt();
+            return sum + parsedQty;
+          });
+
+          final totalHarga = items.fold<num>(0, (sum, item) {
+            final harga = item['total_harga'];
+            final parsedHarga =
+                harga is String ? num.tryParse(harga) ?? 0 : harga;
+            return sum + parsedHarga;
+          });
 
           return GestureDetector(
             onTap: () => _navigateToDetailPage(order, status),
@@ -156,68 +222,56 @@ class _OrdersPageState extends State<OrdersPage> with TickerProviderStateMixin {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header Row: Order ID & Status
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          "No. ${order['orderId']}",
+                          "🛒 ${order['id_pembayaran'] ?? '-'}",
                           style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
                           ),
                         ),
                         _buildStatusBadge(status),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     Text(
-                      "Tanggal: ${order['date']}",
-                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                      "📅 $formattedDate",
+                      style: const TextStyle(fontSize: 13, color: Colors.grey),
                     ),
-                    const Divider(height: 24),
-                    // First product preview
+                    const Divider(height: 20),
                     if (firstItem != null)
-                      Row(
-                        children: [
-                          Container(
-                            width: 50,
-                            height: 50,
-                            margin: const EdgeInsets.only(right: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                              Icons.shopping_bag_outlined,
-                              size: 28,
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              items.length > 1
-                                  ? "${firstItem['name']} x${firstItem['quantity']} dan ${items.length - 1} produk lainnya"
-                                  : "${firstItem['name']} x${firstItem['quantity']}",
-                              style: const TextStyle(fontSize: 15),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
+                      Text(
+                        "🧥 ${firstItem['produk']?['nama_produk'] ?? '-'} x${firstItem['jumlah']}",
+                        style: const TextStyle(fontSize: 14),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    const SizedBox(height: 16),
-                    // Footer Row: Total items & Total Price
+                    if (additionalCount > 0)
+                      Text(
+                        "+$additionalCount produk lainnya",
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    const SizedBox(height: 10),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          "$totalItems produk",
-                          style: const TextStyle(color: Colors.grey),
+                          "📦 Total: $totalItems produk",
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.black54,
+                          ),
                         ),
                         Text(
-                          currencyFormatter.format(order['total']),
+                          "💸 ${currencyFormatter.format(totalHarga)}",
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                            fontSize: 15,
                             color: Colors.red,
                           ),
                         ),
@@ -249,7 +303,6 @@ class _OrdersPageState extends State<OrdersPage> with TickerProviderStateMixin {
       default:
         detailPage = OrderDetailReceivedPage(order: order);
     }
-
     Navigator.push(context, MaterialPageRoute(builder: (_) => detailPage));
   }
 
@@ -271,7 +324,6 @@ class _OrdersPageState extends State<OrdersPage> with TickerProviderStateMixin {
       default:
         color = Colors.grey;
     }
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(

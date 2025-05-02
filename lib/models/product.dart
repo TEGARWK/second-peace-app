@@ -35,14 +35,21 @@ class Product {
 
   /// Digunakan untuk data dari API Laravel
   factory Product.fromJson(Map<String, dynamic> json) {
+    print('🧩 JSON Produk: $json');
+
     return Product(
-      id: json['id'],
-      name: json['nama'], // sesuai API Laravel
+      id: json['id_produk'] ?? json['id'] ?? 0,
+      name: json['nama_produk'] ?? '-',
       description: json['deskripsi'] ?? '',
-      price: (json['harga'] as num).toDouble(),
+      price: (json['harga'] ?? 0).toDouble(),
       stock: json['stok'] ?? 0,
       size: json['size'],
-      imageUrl: json['gambar'],
+      imageUrl:
+          json['gambar'] != null
+              ? (json['gambar'].toString().startsWith('http')
+                  ? json['gambar']
+                  : 'http://10.0.2.2:8000/uploads/${json['gambar']}')
+              : null,
     );
   }
 

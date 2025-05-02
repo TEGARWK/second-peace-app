@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
 import '../models/product.dart';
 import '../screens/checkout_page.dart';
 import '../widgets/custom_navbar.dart';
 import '../providers/cart_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DetailPage extends StatefulWidget {
   final Product product;
@@ -53,20 +56,24 @@ class _DetailPageState extends State<DetailPage> {
                 ),
                 child:
                     imageUrl != null && imageUrl.startsWith('http')
-                        ? Image.network(
-                          imageUrl,
+                        ? CachedNetworkImage(
+                          imageUrl: imageUrl,
                           width: double.infinity,
                           height: 300,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _errorImage(),
+                          placeholder:
+                              (context, url) => Shimmer.fromColors(
+                                baseColor: Colors.grey.shade300,
+                                highlightColor: Colors.grey.shade100,
+                                child: Container(
+                                  width: double.infinity,
+                                  height: 300,
+                                  color: Colors.grey.shade300,
+                                ),
+                              ),
+                          errorWidget: (context, url, error) => _errorImage(),
                         )
-                        : Image.asset(
-                          imageUrl ?? 'assets/placeholder.png',
-                          width: double.infinity,
-                          height: 300,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _errorImage(),
-                        ),
+                        : _errorImage(),
               ),
             ),
             const SizedBox(height: 16),
@@ -99,6 +106,12 @@ class _DetailPageState extends State<DetailPage> {
                       style: const TextStyle(fontSize: 16, color: Colors.grey),
                     ),
                   ],
+                  const SizedBox(height: 8),
+                  Text(
+                    "Stok: ${widget.product.stock}",
+                    style: const TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
+
                   const SizedBox(height: 16),
                   Text(
                     showFullDescription
@@ -126,8 +139,6 @@ class _DetailPageState extends State<DetailPage> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // Tombol aksi
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Row(
@@ -142,6 +153,10 @@ class _DetailPageState extends State<DetailPage> {
                                 (_) => CheckoutPage(
                                   selectedItems: [
                                     {
+                                      'id_produk':
+                                          widget
+                                              .product
+                                              .id, // ✅ harus sama dengan yang di-backend
                                       'name': widget.product.name,
                                       'price': widget.product.price.toDouble(),
                                       'quantity': 1,
@@ -181,13 +196,32 @@ class _DetailPageState extends State<DetailPage> {
                       ],
                     ),
                     child: IconButton(
-                      // ✅ tambahkan child:
                       onPressed: () async {
                         try {
+                          final prefs = await SharedPreferences.getInstance();
+                          final userId = prefs.getInt('userId');
+
+                          if (userId == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Anda belum login.'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                            return;
+                          }
+
                           await Provider.of<CartProvider>(
                             context,
                             listen: false,
-                          ).addItem(widget.product.id, 1);
+                          ).addItem(
+                            userId: userId,
+                            produkId: widget.product.id,
+                            jumlah: 1,
+                            name: widget.product.name,
+                            imageUrl: imageUrl ?? 'assets/placeholder.png',
+                            harga: widget.product.price.toInt(),
+                          );
 
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
@@ -198,14 +232,13 @@ class _DetailPageState extends State<DetailPage> {
                         } catch (e) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text(
-                                'Gagal menambahkan produk ke keranjang!',
-                              ),
+                              content: Text('Gagal menambahkan ke keranjang!'),
                               duration: Duration(seconds: 2),
                             ),
                           );
                         }
                       },
+
                       icon: const Icon(
                         Icons.shopping_cart_outlined,
                         color: Colors.black87,
@@ -217,8 +250,6 @@ class _DetailPageState extends State<DetailPage> {
               ),
             ),
             const SizedBox(height: 30),
-
-            // Produk Terkait
             if (relatedProducts.isNotEmpty) ...[
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16.0),
@@ -273,26 +304,24 @@ class _DetailPageState extends State<DetailPage> {
                                 topLeft: Radius.circular(12),
                                 topRight: Radius.circular(12),
                               ),
-                              child:
-                                  relatedImage != null &&
-                                          relatedImage.startsWith('http')
-                                      ? Image.network(
-                                        relatedImage,
+                              child: CachedNetworkImage(
+                                imageUrl: relatedImage ?? '',
+                                width: 130,
+                                height: 90,
+                                fit: BoxFit.cover,
+                                placeholder:
+                                    (context, url) => Shimmer.fromColors(
+                                      baseColor: Colors.grey.shade300,
+                                      highlightColor: Colors.grey.shade100,
+                                      child: Container(
                                         width: 130,
                                         height: 90,
-                                        fit: BoxFit.cover,
-                                        errorBuilder:
-                                            (_, __, ___) => _errorImage(),
-                                      )
-                                      : Image.asset(
-                                        relatedImage ??
-                                            'assets/placeholder.png',
-                                        width: 130,
-                                        height: 90,
-                                        fit: BoxFit.cover,
-                                        errorBuilder:
-                                            (_, __, ___) => _errorImage(),
+                                        color: Colors.grey.shade300,
                                       ),
+                                    ),
+                                errorWidget:
+                                    (context, url, error) => _errorImage(),
+                              ),
                             ),
                             Padding(
                               padding: const EdgeInsets.all(8.0),
@@ -338,6 +367,8 @@ class _DetailPageState extends State<DetailPage> {
   Widget _errorImage() {
     return Container(
       color: Colors.grey[300],
+      width: double.infinity,
+      height: 300,
       child: const Center(child: Icon(Icons.broken_image, size: 50)),
     );
   }

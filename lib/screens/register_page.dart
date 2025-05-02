@@ -15,7 +15,6 @@ class _RegisterPageState extends State<RegisterPage> {
   final nameController = TextEditingController();
   final usernameController = TextEditingController();
   final emailController = TextEditingController();
-  final phoneController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
 
@@ -35,18 +34,24 @@ class _RegisterPageState extends State<RegisterPage> {
     final nama = nameController.text.trim();
     final username = usernameController.text.trim();
     final email = emailController.text.trim();
-    final noTelepon = phoneController.text.trim();
     final password = passwordController.text;
     final confirmPassword = confirmPasswordController.text;
 
     if (nama.isEmpty ||
         username.isEmpty ||
         email.isEmpty ||
-        noTelepon.isEmpty ||
         password.isEmpty ||
         confirmPassword.isEmpty) {
       setState(() {
         errorMessage = "Semua field wajib diisi.";
+        _isLoading = false;
+      });
+      return;
+    }
+
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+      setState(() {
+        errorMessage = "Format email tidak valid.";
         _isLoading = false;
       });
       return;
@@ -65,24 +70,22 @@ class _RegisterPageState extends State<RegisterPage> {
         nama: nama,
         username: username,
         email: email,
-        noTelepon: noTelepon,
         password: password,
       );
 
       if (response['success'] == true) {
-        final user = response['user'];
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('isLoggedIn', true);
-        await prefs.setInt('userId', user['id']);
-        await prefs.setString('userName', user['nama']);
-        await prefs.setString('userEmail', user['email']);
-        await prefs.setString('userPhone', user['no_telepon']);
+        await prefs.setString('token', response['token']);
+        await prefs.setInt('userId', response['user']['id']);
+        await prefs.setString('userName', response['user']['nama']);
+        await prefs.setString('userEmail', response['user']['email']);
+        await prefs.setInt('navIndex', 2);
 
         if (mounted) {
-          Navigator.pushReplacement(
+          Navigator.of(
             context,
-            MaterialPageRoute(builder: (_) => const MainScreen()),
-          );
+          ).pushNamedAndRemoveUntil('/main', (route) => false);
         }
       } else {
         setState(() {
@@ -110,9 +113,9 @@ class _RegisterPageState extends State<RegisterPage> {
         await prefs.setString('userEmail', account.email);
 
         if (mounted) {
-          Navigator.pushReplacement(
-            context,
+          Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (_) => const MainScreen()),
+            (route) => false,
           );
         }
       }
@@ -182,11 +185,6 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               const SizedBox(height: 16),
               buildTextField(controller: emailController, hintText: "Email"),
-              const SizedBox(height: 16),
-              buildTextField(
-                controller: phoneController,
-                hintText: "Nomor Telepon",
-              ),
               const SizedBox(height: 16),
               buildTextField(
                 controller: passwordController,

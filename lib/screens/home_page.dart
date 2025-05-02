@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/product.dart';
-import '../services/product_service.dart';
 import 'detail_page.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final List<Product> products;
+  const HomePage({super.key, required this.products});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -19,24 +21,28 @@ class _HomePageState extends State<HomePage> {
     'aksesoris',
   ];
 
-  late Future<List<Product>> _futureProducts;
   late ScrollController _scrollController;
-  bool _showCategories = true;
+  bool _showCategories = false; // 🔧 default tertutup
+  bool _forceHideCategoryByScroll = false;
   double _lastOffset = 0.0;
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController();
-    _futureProducts = ProductService().fetchProducts();
 
     _scrollController.addListener(() {
       double currentOffset = _scrollController.offset;
+
+      // Scroll ke bawah ➜ sembunyikan
       if (currentOffset > _lastOffset && _showCategories) {
-        setState(() => _showCategories = false);
-      } else if (currentOffset < _lastOffset && !_showCategories) {
-        setState(() => _showCategories = true);
+        setState(() {
+          _showCategories = false;
+          _forceHideCategoryByScroll = true;
+        });
       }
+
+      // Scroll ke atas ➜ jangan tampilkan lagi otomatis
       _lastOffset = currentOffset;
     });
   }
@@ -45,6 +51,13 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _toggleCategory() {
+    setState(() {
+      _showCategories = !_showCategories;
+      _forceHideCategoryByScroll = false; // reset scroll state
+    });
   }
 
   String formatRupiah(double price) {
@@ -89,9 +102,8 @@ class _HomePageState extends State<HomePage> {
                     ),
                     const SizedBox(width: 12),
                     GestureDetector(
-                      onTap: () {
-                        setState(() => _showCategories = !_showCategories);
-                      },
+                      onTap: _toggleCategory,
+
                       child: Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
@@ -169,31 +181,19 @@ class _HomePageState extends State<HomePage> {
 
             const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
-            // Produk Grid dari API
+            // Produk Grid dari data langsung (tanpa FutureBuilder)
             SliverToBoxAdapter(
-              child: FutureBuilder<List<Product>>(
-                future: _futureProducts,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Padding(
-                      padding: EdgeInsets.all(40),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  } else if (snapshot.hasError) {
-                    return Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Center(
-                        child: Text('Gagal memuat produk: ${snapshot.error}'),
-                      ),
-                    );
-                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              child: Builder(
+                builder: (context) {
+                  final products = widget.products;
+
+                  if (products.isEmpty) {
                     return const Padding(
                       padding: EdgeInsets.all(16.0),
                       child: Center(child: Text('Tidak ada produk.')),
                     );
                   }
 
-                  final products = snapshot.data!;
                   return GridView.builder(
                     physics: const NeverScrollableScrollPhysics(),
                     shrinkWrap: true,
@@ -293,26 +293,28 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildProductImage(Product product) {
     final imagePath = product.imageUrl ?? '';
-    if (imagePath.startsWith('http')) {
-      return Image.network(
-        imagePath,
-        fit: BoxFit.cover,
-        errorBuilder:
-            (_, __, ___) => Container(
-              color: Colors.grey[300],
-              child: const Icon(Icons.broken_image, size: 50),
-            ),
-      );
-    } else {
-      return Image.asset(
-        imagePath.isNotEmpty ? imagePath : 'assets/placeholder.png',
-        fit: BoxFit.cover,
-        errorBuilder:
-            (_, __, ___) => Container(
-              color: Colors.grey[300],
-              child: const Icon(Icons.broken_image, size: 50),
-            ),
+
+    if (imagePath.isEmpty) {
+      return Container(
+        color: Colors.grey[300],
+        child: const Icon(Icons.image, size: 50),
       );
     }
+
+    return CachedNetworkImage(
+      imageUrl: imagePath,
+      fit: BoxFit.cover,
+      placeholder:
+          (context, url) => Shimmer.fromColors(
+            baseColor: Colors.grey.shade300,
+            highlightColor: Colors.grey.shade100,
+            child: Container(color: Colors.grey.shade300),
+          ),
+      errorWidget:
+          (context, url, error) => Container(
+            color: Colors.grey[300],
+            child: const Icon(Icons.broken_image, size: 50),
+          ),
+    );
   }
 }
