@@ -4,10 +4,21 @@ from datetime import datetime
 
 def send_telegram_message(token, chat_id, file_path, message):
     url = f"https://api.telegram.org/bot{token}/sendDocument"
-    files = {'document': open(file_path, 'rb')}
-    data = {'chat_id': chat_id, 'caption': message}
-    response = requests.post(url, files=files, data=data)
-    return response.json()
+    try:
+        with open(file_path, 'rb') as f:
+            files = {'document': f}
+            data = {
+                'chat_id': chat_id,
+                'caption': message,
+                'parse_mode': 'Markdown'  # opsional, jika kamu pakai Markdown di caption
+            }
+            response = requests.post(url, files=files, data=data)
+            print(response.json())
+            return response
+    except FileNotFoundError:
+        print(f"❌ APK file not found: {file_path}")
+        exit(1)
+
 
 telegram_token = os.getenv('TELEGRAM_BOT_TOKEN')
 chat_id = os.getenv('TELEGRAM_CHAT_ID')

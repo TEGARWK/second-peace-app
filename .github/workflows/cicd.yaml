@@ -55,6 +55,10 @@ jobs:
       - name: Install Python dependencies
         run: pip install requests
 
+      - name: Extract commit message
+        run: |
+          echo "GITHUB_COMMIT_MESSAGE=$(git log -1 --pretty=%B)" >> $GITHUB_ENV
+
       - name: Send APK to Telegram
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
