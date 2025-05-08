@@ -6,7 +6,6 @@ class CartProvider extends ChangeNotifier {
 
   CartProvider({required this.cartService});
 
-  // ✅ Setter jika ingin ganti CartService setelah login
   set setCartService(CartService newService) {
     cartService = newService;
     notifyListeners();
@@ -25,7 +24,7 @@ class CartProvider extends ChangeNotifier {
   /// 🔄 Ambil data keranjang dari backend
   Future<void> fetchCart(int userId) async {
     if (userId == null) {
-      print('⚠️ fetchCart dibatalkan karena userId null');
+      debugPrint('⚠️ fetchCart dibatalkan karena userId null');
       return;
     }
 
@@ -37,11 +36,11 @@ class CartProvider extends ChangeNotifier {
               .toList();
       notifyListeners();
     } catch (e) {
-      print('❌ Error fetchCart: $e');
+      debugPrint('❌ Error fetchCart: $e');
     }
   }
 
-  /// ➕ Tambah item ke keranjang
+  /// ➕ Tambah item ke keranjang (dengan pengecekan duplikat)
   Future<void> addItem({
     required int userId,
     required int produkId,
@@ -51,8 +50,19 @@ class CartProvider extends ChangeNotifier {
     required int harga,
   }) async {
     try {
-      print(
-        '[CartProvider] ➕ addItem userId=$userId produkId=$produkId jumlah=$jumlah',
+      // ✅ Cek apakah produk sudah ada di keranjang
+      final alreadyInCart = _cartItems.any((item) {
+        final itemProduk = item['produk'];
+        return itemProduk != null && itemProduk['id_produk'] == produkId;
+      });
+
+      if (alreadyInCart) {
+        debugPrint('⚠️ Produk ini sudah ada di keranjang!');
+        throw Exception('Produk ini sudah ada di keranjang');
+      }
+
+      debugPrint(
+        '[CartProvider] ➕ Tambah produk ID: $produkId untuk user $userId',
       );
       await cartService.addToCart(
         userId: userId,
@@ -61,7 +71,7 @@ class CartProvider extends ChangeNotifier {
       );
       await fetchCart(userId);
     } catch (e) {
-      print('❌ Error addItem: $e');
+      debugPrint('❌ Error addItem: $e');
       rethrow;
     }
   }
@@ -72,7 +82,7 @@ class CartProvider extends ChangeNotifier {
       await cartService.removeFromCart(keranjangId);
       await fetchCart(userId);
     } catch (e) {
-      print('Error removeItem: $e');
+      debugPrint('Error removeItem: $e');
     }
   }
 
@@ -93,9 +103,9 @@ class CartProvider extends ChangeNotifier {
   /// 💰 Total harga item terpilih
   int get getTotalPrice {
     return _cartItems.fold<int>(0, (sum, item) {
-      final price = (item['produk']['harga'] as num).toInt();
-      final quantity = (item['jumlah'] as num).toInt();
-      return item['selected'] == true ? sum + (price * quantity) : sum;
+      final harga = (item['produk']?['harga'] ?? 0) as num;
+      final qty = (item['jumlah'] ?? 1) as num;
+      return item['selected'] == true ? sum + (harga * qty).toInt() : sum;
     });
   }
 

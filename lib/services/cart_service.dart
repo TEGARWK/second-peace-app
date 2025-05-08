@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class CartService {
@@ -17,17 +18,21 @@ class CartService {
   Future<List<dynamic>> fetchCartItems(int userId) async {
     final url = Uri.parse('$baseUrl/keranjang/$userId');
 
-    print('[CartService] Token digunakan: $token');
-    print('[CartService] 🔽 GET: $url');
+    if (kDebugMode) {
+      print('[CartService] 🔽 GET: $url');
+      print('[CartService] Token digunakan: $token');
+    }
 
     final response = await http.get(url, headers: headers);
 
-    print('[CartService] Status: ${response.statusCode}');
-    print('[CartService] Body: ${response.body}');
+    if (kDebugMode) {
+      print('[CartService] Status: ${response.statusCode}');
+      print('[CartService] Body: ${response.body}');
+    }
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return data['keranjang'];
+      return data['keranjang'] ?? [];
     } else {
       throw Exception('Gagal mengambil data keranjang\n${response.body}');
     }
@@ -47,16 +52,24 @@ class CartService {
 
     final url = Uri.parse('$baseUrl/keranjang');
 
-    print('[CartService] 🔼 POST: $url');
-    print('[CartService] Body: $body');
+    if (kDebugMode) {
+      print('[CartService] 🔼 POST: $url');
+      print('[CartService] Body: $body');
+    }
 
     final response = await http.post(url, headers: headers, body: body);
 
-    print('[CartService] Status: ${response.statusCode}');
-    print('[CartService] Response: ${response.body}');
+    if (kDebugMode) {
+      print('[CartService] Status: ${response.statusCode}');
+      print('[CartService] Response: ${response.body}');
+    }
 
     if (response.statusCode != 200) {
       throw Exception('Gagal menambahkan ke keranjang\n${response.body}');
+    }
+
+    if (response.statusCode == 409) {
+      throw Exception('409');
     }
   }
 
@@ -64,11 +77,16 @@ class CartService {
   Future<void> removeFromCart(int keranjangId) async {
     final url = Uri.parse('$baseUrl/keranjang/$keranjangId');
 
+    if (kDebugMode) {
+      print('[CartService] ❌ DELETE: $url');
+    }
+
     final response = await http.delete(url, headers: headers);
 
-    print('[CartService] ❌ DELETE: $url');
-    print('[CartService] Status: ${response.statusCode}');
-    print('[CartService] Response: ${response.body}');
+    if (kDebugMode) {
+      print('[CartService] Status: ${response.statusCode}');
+      print('[CartService] Response: ${response.body}');
+    }
 
     if (response.statusCode != 200) {
       throw Exception('Gagal menghapus dari keranjang\n${response.body}');

@@ -49,7 +49,10 @@ class _AccountPageState extends State<AccountPage> {
     });
 
     if (isLoggedIn && email != null && email.isNotEmpty) {
-      _fetchOrderCounts(email);
+      final token = prefs.getString('token');
+      if (token != null) {
+        _fetchOrderCounts(token);
+      }
     }
   }
 

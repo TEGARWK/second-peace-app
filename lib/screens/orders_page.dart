@@ -3,10 +3,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+
+// Import halaman detail
 import 'order_detail_unpaid_page.dart';
 import 'order_detail_processing_page.dart';
 import 'order_detail_shipped_page.dart';
 import 'order_detail_received_page.dart';
+
+// Import Route Observer (pastikan ini diset di main.dart)
+final RouteObserver<ModalRoute<void>> routeObserver =
+    RouteObserver<ModalRoute<void>>();
 
 class OrdersPage extends StatefulWidget {
   const OrdersPage({super.key});
@@ -15,11 +21,13 @@ class OrdersPage extends StatefulWidget {
   State<OrdersPage> createState() => _OrdersPageState();
 }
 
-class _OrdersPageState extends State<OrdersPage> with TickerProviderStateMixin {
+class _OrdersPageState extends State<OrdersPage>
+    with TickerProviderStateMixin, RouteAware {
   List<Map<String, dynamic>> unpaid = [];
   List<Map<String, dynamic>> processing = [];
   List<Map<String, dynamic>> shipped = [];
   List<Map<String, dynamic>> received = [];
+  List<Map<String, dynamic>> cancelled = [];
 
   final currencyFormatter = NumberFormat.currency(
     locale: 'id_ID',
@@ -33,16 +41,50 @@ class _OrdersPageState extends State<OrdersPage> with TickerProviderStateMixin {
     _loadUserOrders();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context)!);
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    _loadUserOrders(); // Auto-refresh ketika kembali dari SnapWebView
+  }
+
+  String mapStatusToTab(String backendStatus) {
+    switch (backendStatus) {
+      case 'Menunggu Pembayaran':
+        return 'Belum Bayar';
+      case 'Pembayaran Diterima':
+      case 'Sedang Diproses':
+        return 'Diproses';
+      case 'Pesanan Dikirim':
+        return 'Dikirim';
+      case 'Pesanan Diterima':
+        return 'Selesai';
+      case 'Pesanan Dibatalkan':
+        return 'Dibatalkan';
+      default:
+        return 'Lainnya';
+    }
+  }
+
   Future<void> _loadUserOrders() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
-    final userId = prefs.getInt('userId');
 
-    if (token == null || userId == null) return;
+    if (token == null) return;
 
     try {
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:8000/api/pesanan'),
+        Uri.parse('https://secondpeace.my.id/api/pesanan'),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -54,37 +96,11 @@ class _OrdersPageState extends State<OrdersPage> with TickerProviderStateMixin {
         final List orders = data['pesanan'];
 
         setState(() {
-          unpaid =
-              orders
-                  .where((o) => o['status_pesanan'] == 'Menunggu Pembayaran')
-                  .map<Map<String, dynamic>>(
-                    (e) => Map<String, dynamic>.from(e),
-                  )
-                  .toList();
-
-          processing =
-              orders
-                  .where((o) => o['status_pesanan'] == 'Pembayaran Diterima')
-                  .map<Map<String, dynamic>>(
-                    (e) => Map<String, dynamic>.from(e),
-                  )
-                  .toList();
-
-          shipped =
-              orders
-                  .where((o) => o['status_pesanan'] == 'Dikirim')
-                  .map<Map<String, dynamic>>(
-                    (e) => Map<String, dynamic>.from(e),
-                  )
-                  .toList();
-
-          received =
-              orders
-                  .where((o) => o['status_pesanan'] == 'Selesai')
-                  .map<Map<String, dynamic>>(
-                    (e) => Map<String, dynamic>.from(e),
-                  )
-                  .toList();
+          unpaid = _filterOrders(orders, 'Belum Bayar');
+          processing = _filterOrders(orders, 'Diproses');
+          shipped = _filterOrders(orders, 'Dikirim');
+          received = _filterOrders(orders, 'Selesai');
+          cancelled = _filterOrders(orders, 'Dibatalkan');
         });
       } else {
         print('Gagal memuat pesanan: ${response.body}');
@@ -94,10 +110,17 @@ class _OrdersPageState extends State<OrdersPage> with TickerProviderStateMixin {
     }
   }
 
+  List<Map<String, dynamic>> _filterOrders(List orders, String statusTab) {
+    return orders
+        .where((o) => mapStatusToTab(o['status_pesanan']) == statusTab)
+        .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4,
+      length: 5,
       child: Scaffold(
         backgroundColor: Colors.grey[100],
         appBar: AppBar(
@@ -106,43 +129,40 @@ class _OrdersPageState extends State<OrdersPage> with TickerProviderStateMixin {
           elevation: 0,
           title: const Text(
             'Pesanan Saya',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 20,
-              color: Colors.black87,
-            ),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
           ),
           centerTitle: true,
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(50),
-            child: Container(
-              color: Colors.white,
-              child: const TabBar(
-                isScrollable: true,
-                labelColor: Colors.black,
-                unselectedLabelColor: Colors.grey,
-                indicatorColor: Colors.black,
-                indicatorWeight: 2.5,
-                labelStyle: TextStyle(fontWeight: FontWeight.w600),
-                tabs: [
-                  Tab(
-                    icon: Icon(Icons.payments_outlined),
-                    child: Text('Belum Bayar', style: TextStyle(fontSize: 12)),
-                  ),
-                  Tab(
-                    icon: Icon(Icons.inventory_2_outlined),
-                    child: Text('Diproses', style: TextStyle(fontSize: 12)),
-                  ),
-                  Tab(
-                    icon: Icon(Icons.local_shipping_outlined),
-                    child: Text('Dikirim', style: TextStyle(fontSize: 12)),
-                  ),
-                  Tab(
-                    icon: Icon(Icons.check_circle_outline),
-                    child: Text('Selesai', style: TextStyle(fontSize: 12)),
-                  ),
-                ],
-              ),
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(50),
+            child: TabBar(
+              isScrollable: true,
+              labelColor: Colors.black,
+              unselectedLabelColor: Colors.grey,
+              indicatorColor: Colors.black,
+              indicatorWeight: 2.5,
+              labelStyle: TextStyle(fontWeight: FontWeight.w600),
+              tabs: [
+                Tab(
+                  icon: Icon(Icons.payments_outlined),
+                  child: Text('Belum Bayar', style: TextStyle(fontSize: 12)),
+                ),
+                Tab(
+                  icon: Icon(Icons.inventory_2_outlined),
+                  child: Text('Diproses', style: TextStyle(fontSize: 12)),
+                ),
+                Tab(
+                  icon: Icon(Icons.local_shipping_outlined),
+                  child: Text('Dikirim', style: TextStyle(fontSize: 12)),
+                ),
+                Tab(
+                  icon: Icon(Icons.check_circle_outline),
+                  child: Text('Selesai', style: TextStyle(fontSize: 12)),
+                ),
+                Tab(
+                  icon: Icon(Icons.cancel_outlined),
+                  child: Text('Dibatalkan', style: TextStyle(fontSize: 12)),
+                ),
+              ],
             ),
           ),
         ),
@@ -152,6 +172,7 @@ class _OrdersPageState extends State<OrdersPage> with TickerProviderStateMixin {
             _buildOrderList(processing, 'Diproses'),
             _buildOrderList(shipped, 'Dikirim'),
             _buildOrderList(received, 'Selesai'),
+            _buildOrderList(cancelled, 'Dibatalkan'),
           ],
         ),
       ),
@@ -175,39 +196,27 @@ class _OrdersPageState extends State<OrdersPage> with TickerProviderStateMixin {
         itemCount: orders.length,
         itemBuilder: (context, index) {
           final order = orders[index];
-          final items =
-              (order['detail_pesanan'] is List)
-                  ? List<Map<String, dynamic>>.from(order['detail_pesanan'])
-                  : [];
-
-          final createdAt = order['created_at'] ?? '';
-          String formattedDate = '-';
-          try {
-            final date = DateTime.parse(createdAt);
-            formattedDate = DateFormat(
-              'd MMMM yyyy, HH:mm',
-              'id_ID',
-            ).format(date);
-            print("📅 formattedDate: $formattedDate"); // debug
-          } catch (e) {
-            print("⚠️ Gagal format tanggal: $e");
-          }
-
+          final items = List<Map<String, dynamic>>.from(
+            order['detail_pesanan'] ?? [],
+          );
           final firstItem = items.isNotEmpty ? items[0] : null;
+
           final additionalCount = (items.length - 1).clamp(0, items.length);
           final totalItems = items.fold<int>(0, (sum, item) {
             final qty = item['jumlah'];
-            final parsedQty =
-                qty is String ? int.tryParse(qty) ?? 0 : (qty as num).toInt();
-            return sum + parsedQty;
+            return sum + (qty is int ? qty : int.tryParse(qty.toString()) ?? 0);
           });
 
           final totalHarga = items.fold<num>(0, (sum, item) {
-            final harga = item['total_harga'];
-            final parsedHarga =
-                harga is String ? num.tryParse(harga) ?? 0 : harga;
-            return sum + parsedHarga;
+            return sum + ((item['harga'] ?? 0) * (item['jumlah'] ?? 1));
           });
+
+          final formattedDate = DateFormat(
+            'd MMMM yyyy, HH:mm',
+            'id_ID',
+          ).format(
+            DateTime.tryParse(order['tanggal_pesan'] ?? '') ?? DateTime.now(),
+          );
 
           return GestureDetector(
             onTap: () => _navigateToDetailPage(order, status),
@@ -226,13 +235,13 @@ class _OrdersPageState extends State<OrdersPage> with TickerProviderStateMixin {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          "🛒 ${order['id_pembayaran'] ?? '-'}",
+                          "🧾 ID Pesanan: #${order['id_pesanan'] ?? '-'}",
                           style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 15,
                           ),
                         ),
-                        _buildStatusBadge(status),
+                        _buildStatusBadge(order['status_pesanan']),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -243,10 +252,8 @@ class _OrdersPageState extends State<OrdersPage> with TickerProviderStateMixin {
                     const Divider(height: 20),
                     if (firstItem != null)
                       Text(
-                        "🧥 ${firstItem['produk']?['nama_produk'] ?? '-'} x${firstItem['jumlah']}",
+                        "🧥 ${firstItem['nama_produk']} x${firstItem['jumlah']}",
                         style: const TextStyle(fontSize: 14),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     if (additionalCount > 0)
                       Text(
@@ -257,6 +264,14 @@ class _OrdersPageState extends State<OrdersPage> with TickerProviderStateMixin {
                         ),
                       ),
                     const SizedBox(height: 10),
+                    if ((order['nomor_resi'] ?? '').toString().isNotEmpty)
+                      Text(
+                        "🔢 Resi: ${order['nomor_resi']}",
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.black87,
+                        ),
+                      ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -270,9 +285,9 @@ class _OrdersPageState extends State<OrdersPage> with TickerProviderStateMixin {
                         Text(
                           "💸 ${currencyFormatter.format(totalHarga)}",
                           style: const TextStyle(
-                            fontWeight: FontWeight.bold,
                             fontSize: 15,
                             color: Colors.red,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
@@ -306,9 +321,11 @@ class _OrdersPageState extends State<OrdersPage> with TickerProviderStateMixin {
     Navigator.push(context, MaterialPageRoute(builder: (_) => detailPage));
   }
 
-  Widget _buildStatusBadge(String status) {
+  Widget _buildStatusBadge(String backendStatus) {
+    String displayStatus = mapStatusToTab(backendStatus);
     Color color;
-    switch (status) {
+
+    switch (displayStatus) {
       case 'Belum Bayar':
         color = Colors.orange;
         break;
@@ -321,9 +338,13 @@ class _OrdersPageState extends State<OrdersPage> with TickerProviderStateMixin {
       case 'Selesai':
         color = Colors.green;
         break;
+      case 'Dibatalkan':
+        color = Colors.red;
+        break;
       default:
         color = Colors.grey;
     }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -332,7 +353,7 @@ class _OrdersPageState extends State<OrdersPage> with TickerProviderStateMixin {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        status,
+        displayStatus,
         style: TextStyle(
           color: color,
           fontSize: 12,

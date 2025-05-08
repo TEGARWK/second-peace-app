@@ -19,13 +19,13 @@ class Address {
 
   factory Address.fromMap(Map<String, dynamic> map) {
     return Address(
-      id: map['id'],
+      id: map['id'] ?? 0,
       nama: map['nama'] ?? '',
-      telepon: map['telepon'] ?? '',
+      telepon: map['no_whatsapp'] ?? '', // Sesuai dengan Laravel
       alamat: map['alamat'] ?? '',
       kota: map['kota'] ?? '',
-      kodePos: map['kodePos'] ?? '',
-      isPrimary: map['utama'] ?? false, // Laravel pakai `utama`
+      kodePos: map['kode_pos'] ?? '',
+      isPrimary: map['utama'] ?? false, // Laravel menggunakan `utama` (boolean)
     );
   }
 
@@ -33,10 +33,10 @@ class Address {
     return {
       'id': id,
       'nama': nama,
-      'telepon': telepon,
+      'no_whatsapp': telepon,
       'alamat': alamat,
       'kota': kota,
-      'kodePos': kodePos,
+      'kode_pos': kodePos,
       'utama': isPrimary,
     };
   }

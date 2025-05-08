@@ -14,8 +14,6 @@ class CheckoutPage extends StatefulWidget {
 }
 
 class _CheckoutPageState extends State<CheckoutPage> {
-  String? expandedPayment;
-  String? selectedSubPayment;
   String? selectedCourier;
   String userName = "";
   String userAddress = "";
@@ -29,16 +27,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
   );
 
   final Map<String, int> courierEstimates = {'J&T': 2, 'JNE': 3, 'SiCepat': 1};
-
-  final Map<String, String> subPaymentMap = {
-    'BCA VA': 'bca_va',
-    'BNI VA': 'bni_va',
-    'BRI VA': 'bri_va',
-    'OVO': 'ovo',
-    'Gopay': 'gopay',
-    'DANA': 'dana',
-    'ShopeePay': 'shopeepay',
-  };
 
   @override
   void initState() {
@@ -72,46 +60,42 @@ class _CheckoutPageState extends State<CheckoutPage> {
     }
   }
 
-  String get selectedPaymentMethodKey {
-    return subPaymentMap[selectedSubPayment ?? ''] ?? '';
-  }
-
   Future<void> _bayarSekarang(double totalHarga) async {
-    if (widget.selectedItems.isEmpty) {
+    if (selectedCourier == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Tidak ada produk yang dipilih")),
-      );
-      return;
-    }
-
-    if (expandedPayment == null || selectedSubPayment == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Pilih metode pembayaran terlebih dahulu"),
-        ),
+        const SnackBar(content: Text("Pilih kurir terlebih dahulu")),
       );
       return;
     }
 
     try {
-      final List<Map<String, dynamic>> produkList =
-          widget.selectedItems.map((item) {
-            return {
-              'id_produk': item['id_produk'], // ✅ BENAR
-              'jumlah': item['quantity'],
-            };
-          }).toList();
+      final authService = AuthService();
 
-      print('[CHECKOUT DEBUG] produkList: $produkList');
-      print('[CHECKOUT DEBUG] metode: $selectedPaymentMethodKey');
+      Map<String, dynamic> response;
 
-      final response = await AuthService().checkout(
-        produkList,
-        paymentMethod: selectedPaymentMethodKey,
-        ekspedisi: selectedCourier ?? 'J&T', // fallback default
-      );
+      if (widget.selectedItems.isEmpty) {
+        response = await authService.checkoutFromCart();
+      } else {
+        final List<Map<String, dynamic>> produkList =
+            widget.selectedItems.map((item) {
+              return {
+                'id_produk': item['id_produk'],
+                'jumlah': item['quantity'] ?? 1,
+              };
+            }).toList();
 
-      if (response['snap_token'] != null && response['order_id'] != null) {
+        response = await authService.checkout(
+          produkList,
+          paymentMethod:
+              'gopay', // pastikan ini benar dan tersedia di Midtrans kamu
+          ekspedisi: selectedCourier!,
+        );
+      }
+
+      print("🧾 Response Checkout: $response");
+
+      if (response.containsKey('snap_token') &&
+          response.containsKey('order_id')) {
         Navigator.pushNamed(
           context,
           '/snap',
@@ -121,7 +105,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
           },
         );
       } else {
-        throw Exception('Snap token/order_id tidak tersedia');
+        throw Exception('Snap token/order_id tidak tersedia di response');
       }
     } catch (e) {
       print("❌ Gagal saat checkout: $e");
@@ -168,93 +152,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  void _showPaymentOptions() {
-    String? modalExpandedParent = expandedPayment;
-
-    showModalBottomSheet(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final paymentOptions = {
-              'bank va': ['BCA VA', 'BNI VA', 'BRI VA'],
-              'ewallet': ['OVO', 'Gopay', 'DANA', 'ShopeePay'],
-            };
-
-            return ListView(
-              shrinkWrap: true,
-              children:
-                  paymentOptions.entries.map((entry) {
-                    bool isExpanded = modalExpandedParent == entry.key;
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ListTile(
-                          leading: const Icon(Icons.payment),
-                          title: Text(entry.key.toUpperCase()),
-                          trailing:
-                              entry.value.isNotEmpty
-                                  ? Icon(
-                                    isExpanded
-                                        ? Icons.expand_less
-                                        : Icons.expand_more,
-                                  )
-                                  : null,
-                          onTap: () {
-                            if (entry.value.isEmpty) {
-                              setState(() {
-                                expandedPayment = entry.key;
-                                selectedSubPayment = null; // No submethod
-                              });
-                              Navigator.pop(context);
-                            } else {
-                              setModalState(() {
-                                modalExpandedParent =
-                                    isExpanded ? null : entry.key;
-                              });
-                            }
-                          },
-                        ),
-                        AnimatedCrossFade(
-                          duration: const Duration(milliseconds: 300),
-                          crossFadeState:
-                              isExpanded
-                                  ? CrossFadeState.showFirst
-                                  : CrossFadeState.showSecond,
-                          firstChild: Padding(
-                            padding: const EdgeInsets.only(left: 16),
-                            child: Column(
-                              children:
-                                  entry.value.map((sub) {
-                                    return RadioListTile(
-                                      activeColor: Colors.green,
-                                      title: Text(sub),
-                                      value: sub,
-                                      groupValue: selectedSubPayment,
-                                      onChanged: (value) {
-                                        setState(() {
-                                          expandedPayment = entry.key;
-                                          selectedSubPayment = value.toString();
-                                        });
-                                        Navigator.pop(context);
-                                      },
-                                    );
-                                  }).toList(),
-                            ),
-                          ),
-                          secondChild: const SizedBox.shrink(),
-                        ),
-                      ],
-                    );
-                  }).toList(),
-            );
-          },
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     double totalPrice = widget.selectedItems.fold(
@@ -282,9 +179,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
             _buildSectionTitle('Pengiriman'),
             _buildCourierCard(),
             const SizedBox(height: 20),
-            _buildSectionTitle('Metode Pembayaran'),
-            _buildPaymentDisplay(),
-            const SizedBox(height: 80),
           ],
         ),
       ),
@@ -511,63 +405,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   ),
                 ),
               ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPaymentDisplay() {
-    String paymentText = "Pilih Metode Pembayaran";
-    if (expandedPayment != null) {
-      if (selectedSubPayment != null) {
-        paymentText = "$expandedPayment - $selectedSubPayment";
-      } else {
-        paymentText = expandedPayment!;
-      }
-    }
-
-    return GestureDetector(
-      onTap: _showPaymentOptions,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade900, // dark theme
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  paymentText,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "Klik untuk pilih metode",
-                  style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-                ),
-              ],
-            ),
-            const Icon(
-              Icons.arrow_drop_down,
-              color: Color(0xFF00FFB0), // match accent color
-              size: 28,
             ),
           ],
         ),

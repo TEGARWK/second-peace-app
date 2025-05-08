@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:secondpeacem/data/dummy_products.dart'; // Mengambil data produk
-import 'package:secondpeacem/models/product.dart'; // Pastikan Product sudah diimport
-import 'package:secondpeacem/data/dummy_accounts.dart'; // Mengambil data akun
 import 'package:intl/intl.dart';
 
 class OrderDetailProcessingPage extends StatelessWidget {
@@ -13,7 +10,8 @@ class OrderDetailProcessingPage extends StatelessWidget {
     required this.order,
     required this.tabStatus,
   });
-  String formatCurrency(double amount) {
+
+  String formatCurrency(num amount) {
     final formatter = NumberFormat.currency(
       locale: 'id_ID',
       symbol: 'Rp ',
@@ -22,30 +20,25 @@ class OrderDetailProcessingPage extends StatelessWidget {
     return formatter.format(amount);
   }
 
+  String formatDateTime(String rawDateTime) {
+    try {
+      final dt = DateTime.parse(rawDateTime);
+      return DateFormat('dd MMM yyyy HH:mm', 'id_ID').format(dt);
+    } catch (_) {
+      return rawDateTime;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final items = List<Map<String, dynamic>>.from(order['items'] ?? []);
-    final product = items.isNotEmpty ? items[0] : null;
-
-    // Mengambil produk dari dummyProducts berdasarkan productId
-    final productDetails = dummyProducts.firstWhere(
-      (prod) => prod.id == product?['productId'],
-      orElse:
-          () => Product(
-            id: 0,
-            name: 'Produk Tidak Ditemukan',
-            description: '',
-            price: 0.0,
-            stock: 0,
-            size: '',
-            imageUrl: 'assets/images/placeholder.png', // Gambar default
-          ),
+    final List<Map<String, dynamic>> items = List<Map<String, dynamic>>.from(
+      order['detail_pesanan'] ?? [],
     );
-
-    final user = dummyAccounts.firstWhere(
-      (acc) => acc['id'] == order['userId'],
-      orElse: () => {},
-    );
+    final String tanggalPesan = order['tanggal_pesan'] ?? '-';
+    final String ekspedisi = order['ekspedisi'] ?? '-';
+    final String estimasiTiba = order['estimasi_tiba'] ?? '-';
+    final double total =
+        (order['total_harga'] is num) ? order['total_harga'].toDouble() : 0.0;
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -54,7 +47,7 @@ class OrderDetailProcessingPage extends StatelessWidget {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         title: Text(
-          "Pesanan #${order['orderId']}",
+          "Pesanan #${order['id_pesanan'] ?? '-'}",
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
@@ -65,39 +58,50 @@ class OrderDetailProcessingPage extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                _buildExpiredInfo(),
+                _buildProcessingNotice(),
+                const SizedBox(height: 12),
+                _buildSectionTitle("🧾 Daftar Produk"),
+                ...items.map((item) => _buildProductItem(item)).toList(),
                 const SizedBox(height: 20),
-                _buildSectionTitle("Produk"),
-                if (product != null) _buildProductCard(productDetails),
+                _buildSectionTitle("📦 Informasi Pengiriman"),
+                _buildShippingInfo(
+                  penerima: order['penerima'] ?? '-',
+                  alamat: order['alamat'] ?? '-',
+                  whatsapp: order['no_whatsapp'] ?? '-',
+                  tanggal: tanggalPesan,
+                  ekspedisi: ekspedisi,
+                  estimasiTiba: estimasiTiba,
+                ),
                 const SizedBox(height: 20),
-                _buildSectionTitle("Informasi Pesanan"),
-                _buildOrderInfoCard(user),
-                const SizedBox(height: 20),
+                _buildSectionTitle("💳 Informasi Pembayaran"),
+                _buildPaymentInfo(
+                  metode: order['metode_pembayaran'] ?? 'Transfer Bank',
+                  catatan: order['catatan'] ?? 'Tidak ada',
+                ),
               ],
             ),
           ),
-          _buildBottomBar(context),
+          _buildBottomBar(total),
         ],
       ),
     );
   }
 
-  Widget _buildExpiredInfo() {
+  Widget _buildProcessingNotice() {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.blue[50],
         border: Border.all(color: Colors.blue),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: const [
-          Icon(Icons.timelapse, color: Colors.blue),
+          Icon(Icons.local_shipping_outlined, color: Colors.blue),
           SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Pesanan sedang diproses oleh penjual. Mohon ditunggu ya!. Kami sedang menyiapkan produk Anda, akan segera dikirim.',
+              "Pesanan Anda sedang diproses dan akan segera dikirim. Mohon ditunggu ya!",
               style: TextStyle(color: Colors.blue, fontSize: 13),
             ),
           ),
@@ -113,29 +117,45 @@ class OrderDetailProcessingPage extends StatelessWidget {
     );
   }
 
-  Widget _buildProductCard(Product product) {
+  Widget _buildProductItem(Map<String, dynamic> item) {
+    final nama = item['nama_produk'] ?? '-';
+    final jumlah = item['jumlah'] ?? 0;
+    final harga = item['harga'] ?? 0;
+    final ukuran = item['ukuran'] ?? '-';
+    final gambar = item['gambar'] ?? '';
+
     return Card(
       elevation: 2,
+      margin: const EdgeInsets.symmetric(vertical: 6),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Image.asset(
-                product.imageUrl ?? 'assets/images/placeholder.png',
-                width: 70,
-                height: 70,
-                fit: BoxFit.cover,
-                errorBuilder:
-                    (context, error, stackTrace) => Container(
-                      color: Colors.grey[300],
-                      width: 70,
-                      height: 70,
-                      child: const Icon(Icons.image_not_supported),
-                    ),
-              ),
+              child:
+                  gambar.isNotEmpty
+                      ? Image.network(
+                        gambar,
+                        width: 70,
+                        height: 70,
+                        fit: BoxFit.cover,
+                        errorBuilder:
+                            (context, error, stackTrace) => Container(
+                              width: 70,
+                              height: 70,
+                              color: Colors.grey[300],
+                              child: const Icon(Icons.broken_image),
+                            ),
+                      )
+                      : Container(
+                        width: 70,
+                        height: 70,
+                        color: Colors.grey[300],
+                        child: const Icon(Icons.image),
+                      ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -143,20 +163,20 @@ class OrderDetailProcessingPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    product.name,
+                    nama,
                     style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text("Jumlah: ${order['items'][0]['quantity']}"),
+                  const SizedBox(height: 4),
+                  Text("Jumlah: $jumlah"),
+                  Text("Ukuran: $ukuran"),
                   Text(
-                    "Harga: ${formatCurrency(product.price)}",
+                    "Harga: ${formatCurrency(harga)}",
                     style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.red,
                       fontWeight: FontWeight.w500,
+                      color: Colors.red,
                     ),
                   ),
                 ],
@@ -168,7 +188,14 @@ class OrderDetailProcessingPage extends StatelessWidget {
     );
   }
 
-  Widget _buildOrderInfoCard(Map<String, dynamic> user) {
+  Widget _buildShippingInfo({
+    required String penerima,
+    required String alamat,
+    required String whatsapp,
+    required String tanggal,
+    required String ekspedisi,
+    required String estimasiTiba,
+  }) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -177,47 +204,90 @@ class OrderDetailProcessingPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionTitle("Alamat Pengiriman"),
-            _buildDetailCard([
-              "Penerima: ${user['name'] ?? '-'}",
-              "No. HP: ${user['phone'] ?? '-'}",
-              "Alamat: ${order['shippingAddress'] ?? '-'}",
-            ]),
-            const Divider(height: 20),
-            _buildSectionTitle("Pengiriman"),
-            _buildDetailCard([
-              "Kurir: ${order['courier'] ?? '-'}",
-              "Estimasi Tiba: ${order['deliveryEstimate'] ?? '-'}",
-              "No. Resi: ${order['trackingNumber'] ?? '-'}",
-            ]),
-            const Divider(height: 20),
-            _buildSectionTitle("Pembayaran"),
-            _buildDetailCard([
-              "Metode: ${order['paymentMethod'] ?? '-'}",
-              "Catatan: ${order['note'] ?? 'Tidak ada'}",
-            ]),
+            Row(
+              children: [
+                const Icon(Icons.person_outline),
+                const SizedBox(width: 8),
+                Text("Penerima: $penerima"),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.phone_android),
+                const SizedBox(width: 8),
+                Text("WhatsApp: $whatsapp"),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.location_on_outlined),
+                const SizedBox(width: 8),
+                Flexible(child: Text("Alamat: $alamat")),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.access_time),
+                const SizedBox(width: 8),
+                Text("Tanggal Pesan: $tanggal"),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.local_shipping),
+                const SizedBox(width: 8),
+                Text("Ekspedisi: $ekspedisi"),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.calendar_month_outlined),
+                const SizedBox(width: 8),
+                Text("Estimasi Tiba: $estimasiTiba"),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDetailCard(List<String> details) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children:
-          details
-              .map(
-                (text) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Text(text, style: const TextStyle(fontSize: 14)),
-                ),
-              )
-              .toList(),
+  Widget _buildPaymentInfo({required String metode, required String catatan}) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.payments_outlined),
+                const SizedBox(width: 8),
+                Text("Metode: $metode"),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.edit_note),
+                const SizedBox(width: 8),
+                Text("Catatan: $catatan"),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildBottomBar(BuildContext context) {
+  Widget _buildBottomBar(double total) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: const BoxDecoration(
@@ -235,7 +305,7 @@ class OrderDetailProcessingPage extends StatelessWidget {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
               ),
               Text(
-                formatCurrency(order['total']?.toDouble() ?? 0.0),
+                formatCurrency(total),
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -245,7 +315,9 @@ class OrderDetailProcessingPage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          ElevatedButton(
+          ElevatedButton.icon(
+            icon: const Icon(Icons.chat),
+            label: const Text("Chat Toko"),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.black87,
               shape: RoundedRectangleBorder(
@@ -254,12 +326,8 @@ class OrderDetailProcessingPage extends StatelessWidget {
               minimumSize: const Size(double.infinity, 50),
             ),
             onPressed: () {
-              // Integrasi Checkout
+              // TODO: Implementasi fitur chat
             },
-            child: const Text(
-              'Chat Toko',
-              style: TextStyle(fontSize: 16, color: Colors.white),
-            ),
           ),
         ],
       ),

@@ -98,6 +98,28 @@ class _DetailPageState extends State<DetailPage> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                  if (widget.product.kategori != null &&
+                      widget.product.kategori!.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.label_outline,
+                          size: 18,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          "Kategori: ${widget.product.kategori}",
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+
                   if (widget.product.size != null &&
                       widget.product.size!.isNotEmpty) ...[
                     const SizedBox(height: 8),
@@ -197,20 +219,20 @@ class _DetailPageState extends State<DetailPage> {
                     ),
                     child: IconButton(
                       onPressed: () async {
+                        final prefs = await SharedPreferences.getInstance();
+                        final userId = prefs.getInt('userId');
+
+                        if (userId == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Anda belum login.'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                          return;
+                        }
+
                         try {
-                          final prefs = await SharedPreferences.getInstance();
-                          final userId = prefs.getInt('userId');
-
-                          if (userId == null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Anda belum login.'),
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                            return;
-                          }
-
                           await Provider.of<CartProvider>(
                             context,
                             listen: false,
@@ -230,15 +252,20 @@ class _DetailPageState extends State<DetailPage> {
                             ),
                           );
                         } catch (e) {
+                          final isDuplicate = e.toString().contains('409');
+                          final message =
+                              isDuplicate
+                                  ? 'Produk ini sudah ada di keranjang.'
+                                  : 'Gagal menambahkan ke keranjang!';
+
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Gagal menambahkan ke keranjang!'),
-                              duration: Duration(seconds: 2),
+                            SnackBar(
+                              content: Text(message),
+                              duration: const Duration(seconds: 2),
                             ),
                           );
                         }
                       },
-
                       icon: const Icon(
                         Icons.shopping_cart_outlined,
                         color: Colors.black87,

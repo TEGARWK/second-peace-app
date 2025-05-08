@@ -3,7 +3,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:secondpeacem/services/auth_service.dart';
 import 'package:provider/provider.dart';
 import 'package:secondpeacem/providers/cart_provider.dart';
-import 'package:secondpeacem/services/cart_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -51,14 +50,18 @@ class _LoginPageState extends State<LoginPage> {
         await prefs.setInt('userId', user['id'] ?? 0);
         await prefs.setString('userName', user['nama'] ?? 'Pengguna');
         await prefs.setString('userEmail', user['email'] ?? '-');
-        await prefs.setInt('navIndex', 2); // buka tab Akun
+        await prefs.setInt('navIndex', 2);
 
         Provider.of<CartProvider>(context, listen: false).updateToken(token);
 
-        await Provider.of<CartProvider>(
-          context,
-          listen: false,
-        ).fetchCart(user['id']);
+        try {
+          await Provider.of<CartProvider>(
+            context,
+            listen: false,
+          ).fetchCart(user['id']);
+        } catch (e) {
+          debugPrint("Gagal memuat cart: $e");
+        }
 
         if (mounted) {
           Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
@@ -70,7 +73,7 @@ class _LoginPageState extends State<LoginPage> {
       }
     } catch (e) {
       setState(() {
-        errorMessage = "Terjadi kesalahan: ${e.toString()}";
+        errorMessage = "Terjadi kesalahan koneksi.";
       });
     }
 

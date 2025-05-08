@@ -1,18 +1,62 @@
 import 'package:flutter/material.dart';
-import 'package:secondpeacem/data/dummy_products.dart'; // Mengambil data produk
-import 'package:secondpeacem/models/product.dart'; // Pastikan Product sudah diimport
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class OrderDetailUnpaidPage extends StatelessWidget {
   final Map<String, dynamic> order;
   final String tabStatus;
+
+  Future<void> cancelOrder(BuildContext context, int idPesanan) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Autentikasi gagal. Silakan login kembali.'),
+        ),
+      );
+      return;
+    }
+
+    final uri = Uri.parse(
+      'https://yourdomain.com/api/pesanan/$idPesanan/cancel',
+    ); // Ganti URL sesuai route
+    try {
+      final response = await http.patch(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Pesanan berhasil dibatalkan')),
+        );
+        Navigator.pop(context); // kembali ke halaman sebelumnya
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Gagal membatalkan pesanan')));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Terjadi kesalahan: $e')));
+    }
+  }
 
   const OrderDetailUnpaidPage({
     super.key,
     required this.order,
     required this.tabStatus,
   });
-  String formatCurrency(double amount) {
+
+  String formatCurrency(num amount) {
     final formatter = NumberFormat.currency(
       locale: 'id_ID',
       symbol: 'Rp ',
@@ -21,25 +65,26 @@ class OrderDetailUnpaidPage extends StatelessWidget {
     return formatter.format(amount);
   }
 
+  String formatDateTime(String rawDateTime) {
+    try {
+      final dt = DateTime.parse(rawDateTime);
+      return DateFormat('dd MMM yyyy HH:mm', 'id_ID').format(dt);
+    } catch (_) {
+      return rawDateTime;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final items = List<Map<String, dynamic>>.from(order['items'] ?? []);
-    final product = items.isNotEmpty ? items[0] : null;
-
-    // Mengambil produk dari dummyProducts berdasarkan productId
-    final productDetails = dummyProducts.firstWhere(
-      (prod) => prod.id == product?['productId'],
-      orElse:
-          () => Product(
-            id: 0,
-            name: 'Produk Tidak Ditemukan',
-            description: '',
-            price: 0.0,
-            stock: 0,
-            size: '',
-            imageUrl: 'assets/images/placeholder.png', // Gambar default
-          ),
+    final List<Map<String, dynamic>> items = List<Map<String, dynamic>>.from(
+      order['detail_pesanan'] ?? [],
     );
+    final String tanggalPesan = order['tanggal_pesan'] ?? '-';
+    final String expiredAt = order['expired_at'] ?? '';
+    final double total =
+        (order['total_harga'] is num)
+            ? order['total_harga'].toDouble()
+            : double.tryParse(order['total_harga'].toString()) ?? 0.0;
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -48,7 +93,7 @@ class OrderDetailUnpaidPage extends StatelessWidget {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         title: Text(
-          "Pesanan #${order['orderId']}",
+          "Pesanan #${order['id_pesanan'] ?? '-'}",
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
@@ -59,44 +104,66 @@ class OrderDetailUnpaidPage extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                _buildExpiredInfo(),
+                _buildAntrianNotice(expiredAt),
+                const SizedBox(height: 12),
+                _buildSectionTitle("🧾 Daftar Produk"),
+                ...items.map((item) => _buildProductItem(item)).toList(),
                 const SizedBox(height: 20),
-                _buildSectionTitle("Produk"),
-                if (product != null)
-                  _buildProductCard(
-                    productDetails,
-                  ), // Menggunakan productDetails
+                _buildSectionTitle("📦 Informasi Pengiriman"),
+                _buildShippingInfo(
+                  penerima: order['penerima'] ?? '-',
+                  alamat: order['alamat'] ?? '-',
+                  whatsapp: order['no_whatsapp'] ?? '-',
+                  tanggal: tanggalPesan,
+                ),
                 const SizedBox(height: 20),
-                _buildSectionTitle("Informasi Pesanan"),
-                _buildOrderInfoCard(),
-                const SizedBox(height: 20),
+                _buildSectionTitle("💳 Informasi Pembayaran"),
+                _buildPaymentInfo(
+                  metode: order['metode_pembayaran'] ?? 'Transfer Bank',
+                  catatan: order['catatan'] ?? 'Tidak ada',
+                ),
               ],
             ),
           ),
-          _buildBottomBar(context),
+          _buildBottomBar(total, context),
         ],
       ),
     );
   }
 
-  Widget _buildExpiredInfo() {
+  Widget _buildAntrianNotice(String expiredAt) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.orange[50],
-        border: Border.all(color: Colors.orange),
+        color: Colors.red[50],
+        border: Border.all(color: Colors.red),
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          Icon(Icons.timer, color: Colors.orange),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Bayar sebelum 22 Mar 2025 23:59 WIB. Jika lewat waktu ini, pesanan akan otomatis dibatalkan.',
-              style: TextStyle(color: Colors.orange, fontSize: 13),
-            ),
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.warning_amber, color: Colors.red),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  "Karena ini produk preloved, hanya tersedia 1 item. Siapa yang membayar lebih dulu akan mendapatkannya.",
+                  style: TextStyle(color: Colors.red, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Icon(Icons.timer_outlined, color: Colors.red),
+              const SizedBox(width: 8),
+              Text(
+                "Batas bayar: ${formatDateTime(expiredAt)}",
+                style: const TextStyle(fontSize: 13, color: Colors.red),
+              ),
+            ],
           ),
         ],
       ),
@@ -110,29 +177,45 @@ class OrderDetailUnpaidPage extends StatelessWidget {
     );
   }
 
-  Widget _buildProductCard(Product product) {
+  Widget _buildProductItem(Map<String, dynamic> item) {
+    final nama = item['nama_produk'] ?? '-';
+    final jumlah = item['jumlah'] ?? 0;
+    final harga = item['harga'] ?? 0;
+    final ukuran = item['ukuran'] ?? '-';
+    final gambar = item['gambar'] ?? '';
+
     return Card(
       elevation: 2,
+      margin: const EdgeInsets.symmetric(vertical: 6),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Image.asset(
-                product.imageUrl ?? 'assets/images/placeholder.png',
-                width: 70,
-                height: 70,
-                fit: BoxFit.cover,
-                errorBuilder:
-                    (context, error, stackTrace) => Container(
-                      color: Colors.grey[300],
-                      width: 70,
-                      height: 70,
-                      child: const Icon(Icons.image_not_supported),
-                    ),
-              ),
+              child:
+                  gambar.isNotEmpty
+                      ? Image.network(
+                        gambar,
+                        width: 70,
+                        height: 70,
+                        fit: BoxFit.cover,
+                        errorBuilder:
+                            (context, error, stackTrace) => Container(
+                              width: 70,
+                              height: 70,
+                              color: Colors.grey[300],
+                              child: const Icon(Icons.broken_image),
+                            ),
+                      )
+                      : Container(
+                        width: 70,
+                        height: 70,
+                        color: Colors.grey[300],
+                        child: const Icon(Icons.image),
+                      ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -140,20 +223,20 @@ class OrderDetailUnpaidPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    product.name,
+                    nama,
                     style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text("Jumlah: ${order['items'][0]['quantity']}"),
+                  const SizedBox(height: 4),
+                  Text("Jumlah: $jumlah"),
+                  Text("Ukuran: $ukuran"),
                   Text(
-                    "Harga: ${formatCurrency(product.price)}",
+                    "Harga: ${formatCurrency(harga)}",
                     style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.red,
                       fontWeight: FontWeight.w500,
+                      color: Colors.red,
                     ),
                   ),
                 ],
@@ -165,7 +248,12 @@ class OrderDetailUnpaidPage extends StatelessWidget {
     );
   }
 
-  Widget _buildOrderInfoCard() {
+  Widget _buildShippingInfo({
+    required String penerima,
+    required String alamat,
+    required String whatsapp,
+    required String tanggal,
+  }) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -174,47 +262,77 @@ class OrderDetailUnpaidPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionTitle("Alamat Pengiriman"),
-            _buildDetailCard([
-              "Penerima: ${order['recipientName'] ?? '-'}",
-              "No. HP: ${order['recipientPhone'] ?? '-'}",
-              "Alamat: ${order['shippingAddress'] ?? '-'}",
-            ]),
-            const Divider(height: 20), // Added Divider
-            _buildSectionTitle("Pengiriman"),
-            _buildDetailCard([
-              "Kurir: ${order['courier'] ?? '-'}",
-              "Estimasi Tiba: ${order['deliveryEstimate'] ?? '-'}",
-              "No. Resi: ${order['trackingNumber'] ?? '-'}",
-            ]),
-            const Divider(height: 20), // Added Divider
-            _buildSectionTitle("Pembayaran"),
-            _buildDetailCard([
-              "Metode: ${order['paymentMethod'] ?? '-'}",
-              "Catatan: ${order['note'] ?? 'Tidak ada'}",
-            ]),
+            Row(
+              children: [
+                const Icon(Icons.person_outline),
+                const SizedBox(width: 8),
+                Text("Penerima: $penerima"),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.phone_android),
+                const SizedBox(width: 8),
+                Text("WhatsApp: $whatsapp"),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.location_on_outlined),
+                const SizedBox(width: 8),
+                Flexible(child: Text("Alamat: $alamat")),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.access_time),
+                const SizedBox(width: 8),
+                Text("Tanggal Pesan: $tanggal"),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDetailCard(List<String> details) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children:
-          details
-              .map(
-                (text) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Text(text, style: const TextStyle(fontSize: 14)),
-                ),
-              )
-              .toList(),
+  Widget _buildPaymentInfo({required String metode, required String catatan}) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.payments_outlined),
+                const SizedBox(width: 8),
+                Text("Metode: $metode"),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.edit_note),
+                const SizedBox(width: 8),
+                Text("Catatan: $catatan"),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildBottomBar(BuildContext context) {
+  Widget _buildBottomBar(double total, BuildContext context) {
+    final String paymentUrl = order['payment_url'] ?? '';
+    final int idPesanan = order['id_pesanan'] ?? 0;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: const BoxDecoration(
@@ -232,7 +350,7 @@ class OrderDetailUnpaidPage extends StatelessWidget {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
               ),
               Text(
-                formatCurrency(order['total']?.toDouble() ?? 0.0),
+                formatCurrency(total),
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -242,21 +360,57 @@ class OrderDetailUnpaidPage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black87,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => cancelOrder(context, idPesanan),
+
+                  icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                  label: const Text(
+                    "Batalkan Pesanan",
+                    style: TextStyle(color: Colors.red),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.red),
+                    minimumSize: const Size(double.infinity, 45),
+                  ),
+                ),
               ),
-              minimumSize: const Size(double.infinity, 50),
-            ),
-            onPressed: () {
-              // Integrasi Checkout
-            },
-            child: const Text(
-              'Bayar Sekarang',
-              style: TextStyle(fontSize: 16, color: Colors.white),
-            ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black87,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    minimumSize: const Size(double.infinity, 45),
+                  ),
+                  onPressed: () async {
+                    if (paymentUrl.isNotEmpty &&
+                        await canLaunchUrl(Uri.parse(paymentUrl))) {
+                      await launchUrl(
+                        Uri.parse(paymentUrl),
+                        mode: LaunchMode.externalApplication,
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Link pembayaran tidak tersedia atau gagal dibuka',
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text(
+                    'Bayar Sekarang',
+                    style: TextStyle(fontSize: 16, color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

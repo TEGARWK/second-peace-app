@@ -21,10 +21,30 @@ class SnapWebViewPage extends StatefulWidget {
 class _SnapWebViewPageState extends State<SnapWebViewPage> {
   late final WebViewController _controller;
   bool isLoading = true;
+  bool paymentSuccess = false;
+  final bool useProduction = false; // ⛔ Set ke false jika masih pakai sandbox
+  bool tokenValid = true;
 
   @override
   void initState() {
     super.initState();
+    _initWebView();
+  }
+
+  void _initWebView() {
+    final baseSnapUrl =
+        useProduction
+            ? 'https://app.midtrans.com/snap/v2/vtweb/'
+            : 'https://app.sandbox.midtrans.com/snap/v2/vtweb/';
+
+    if (widget.snapToken.isEmpty || widget.snapToken.length < 20) {
+      setState(() => tokenValid = false);
+      return;
+    }
+
+    final fullUrl = '$baseSnapUrl${widget.snapToken}';
+    print('🔗 Opening Snap URL: $fullUrl');
+
     _controller =
         WebViewController()
           ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -58,33 +78,35 @@ class _SnapWebViewPageState extends State<SnapWebViewPage> {
               },
             ),
           )
-          ..loadRequest(
-            Uri.parse(
-              "https://app.sandbox.midtrans.com/snap/v2/vtweb/${widget.snapToken}",
-            ),
-          );
+          ..loadRequest(Uri.parse(fullUrl));
   }
 
   Future<void> _handleSukses() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('navIndex', 1);
+
+    setState(() => paymentSuccess = true);
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text("Pembayaran berhasil!")));
 
-    await Future.delayed(const Duration(seconds: 2));
-
-    // Redirect ke homepage
+    await Future.delayed(const Duration(seconds: 1));
     if (mounted) {
       Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
     }
   }
 
   Future<void> _cekStatusPembayaran() async {
+    setState(() => isLoading = true);
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
 
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:8000/api/verify-payment/${widget.orderId}'),
+        Uri.parse(
+          'https://secondpeace.my.id/api/verify-payment/${widget.orderId}',
+        ),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -95,7 +117,7 @@ class _SnapWebViewPageState extends State<SnapWebViewPage> {
       print('[CEK STATUS] response: $data');
 
       if (data['status'] == 'settlement') {
-        _handleSukses();
+        await _handleSukses();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Status Pembayaran: ${data['status']}')),
@@ -107,10 +129,32 @@ class _SnapWebViewPageState extends State<SnapWebViewPage> {
         const SnackBar(content: Text('Gagal cek status pembayaran')),
       );
     }
+
+    setState(() => isLoading = false);
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!tokenValid) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text("Pembayaran"),
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+        ),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Text(
+              "Snap token tidak valid. Silakan kembali dan ulangi proses checkout.",
+              style: TextStyle(fontSize: 16, color: Colors.redAccent),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Pembayaran"),
@@ -127,22 +171,23 @@ class _SnapWebViewPageState extends State<SnapWebViewPage> {
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.all(12),
-            width: double.infinity,
-            color: Colors.white,
-            child: ElevatedButton(
-              onPressed: _cekStatusPembayaran,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              child: const Text(
-                "Cek Status Pembayaran",
-                style: TextStyle(color: Colors.white),
+          if (!paymentSuccess)
+            Container(
+              padding: const EdgeInsets.all(12),
+              width: double.infinity,
+              color: Colors.white,
+              child: ElevatedButton(
+                onPressed: _cekStatusPembayaran,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text(
+                  "Cek Status Pembayaran",
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
             ),
-          ),
         ],
       ),
     );

@@ -3,6 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:secondpeacem/main.dart';
 import 'package:secondpeacem/services/auth_service.dart';
+import 'package:provider/provider.dart';
+import 'package:secondpeacem/providers/cart_provider.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -82,6 +84,12 @@ class _RegisterPageState extends State<RegisterPage> {
         await prefs.setString('userEmail', response['user']['email']);
         await prefs.setInt('navIndex', 2);
 
+        // ✅ Tambahkan ini agar CartProvider dapat token terbaru
+        Provider.of<CartProvider>(
+          context,
+          listen: false,
+        ).updateToken(response['token']);
+
         if (mounted) {
           Navigator.of(
             context,
@@ -94,7 +102,7 @@ class _RegisterPageState extends State<RegisterPage> {
       }
     } catch (e) {
       setState(() {
-        errorMessage = "Terjadi kesalahan: ${e.toString()}";
+        errorMessage = "Terjadi kesalahan koneksi: ${e.toString()}";
       });
     }
 
@@ -120,7 +128,7 @@ class _RegisterPageState extends State<RegisterPage> {
         }
       }
     } catch (error) {
-      print("Google sign in error: $error");
+      debugPrint("Google sign in error: $error");
     }
   }
 

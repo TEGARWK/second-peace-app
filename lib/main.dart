@@ -1,10 +1,10 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:intl/date_symbol_data_local.dart'; // ✅
-import 'package:flutter_localizations/flutter_localizations.dart'; // ✅
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+
+// Pages & Widgets
 import 'package:secondpeacem/screens/orders_page.dart';
 import 'package:secondpeacem/screens/account_page.dart';
 import 'package:secondpeacem/widgets/custom_navbar.dart';
@@ -15,28 +15,50 @@ import 'package:secondpeacem/screens/product_wrapper.dart';
 import 'package:secondpeacem/screens/register_page.dart';
 import 'package:secondpeacem/screens/login_page.dart';
 
+// ✅ Tambahkan RouteObserver global
+final RouteObserver<ModalRoute<void>> routeObserver =
+    RouteObserver<ModalRoute<void>>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('id_ID', null); // ✅
+  await initializeDateFormatting('id_ID', null);
+  runApp(const MyApp());
+}
 
-  final prefs = await SharedPreferences.getInstance();
-  final token = prefs.getString('token') ?? '';
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
-  final cartService = CartService(
-    baseUrl: 'http://10.0.2.2:8000/api',
-    token: token,
-  );
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<SharedPreferences>(
+      future: SharedPreferences.getInstance(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const MaterialApp(
+            home: Scaffold(body: Center(child: CircularProgressIndicator())),
+          );
+        }
 
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(
-          create: (_) => CartProvider(cartService: cartService),
-        ),
-      ],
-      child: SecondPeaceApp(isLoggedIn: token.isNotEmpty),
-    ),
-  );
+        final prefs = snapshot.data!;
+        final token = prefs.getString('token') ?? '';
+        final isLoggedIn = token.isNotEmpty;
+
+        final cartService = CartService(
+          baseUrl: 'https://secondpeace.my.id/api',
+          token: token,
+        );
+
+        return MultiProvider(
+          providers: [
+            ChangeNotifierProvider(
+              create: (_) => CartProvider(cartService: cartService),
+            ),
+          ],
+          child: SecondPeaceApp(isLoggedIn: isLoggedIn),
+        );
+      },
+    );
+  }
 }
 
 class SecondPeaceApp extends StatelessWidget {
@@ -52,16 +74,12 @@ class SecondPeaceApp extends StatelessWidget {
         fontFamily: 'Arial',
       ),
       localizationsDelegates: const [
-        // ✅
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [
-        // ✅
-        Locale('id', 'ID'),
-        Locale('en', 'US'),
-      ],
+      supportedLocales: const [Locale('id', 'ID'), Locale('en', 'US')],
+      navigatorObservers: [routeObserver], // ✅ tambahkan ini
       initialRoute: isLoggedIn ? '/main' : '/register',
       routes: {
         '/': (context) => const MainScreen(),
@@ -69,12 +87,15 @@ class SecondPeaceApp extends StatelessWidget {
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
         '/snap': (context) {
-          final args =
-              ModalRoute.of(context)!.settings.arguments
-                  as Map<String, dynamic>;
-          return SnapWebViewPage(
-            snapToken: args['snap_token'],
-            orderId: args['order_id'],
+          final args = ModalRoute.of(context)?.settings.arguments;
+          if (args is Map<String, dynamic>) {
+            return SnapWebViewPage(
+              snapToken: args['snap_token'],
+              orderId: args['order_id'],
+            );
+          }
+          return const Scaffold(
+            body: Center(child: Text("Invalid snap token data")),
           );
         },
         '/success': (context) => const PembayaranSuksesPage(),
@@ -98,7 +119,11 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     _loadNavIndex();
-    _pages = [ProductWrapper(), const OrdersPage(), const AccountPage()];
+    _pages = [
+      ProductWrapper(),
+      const OrdersPage(), // ✅ OrdersPage sudah mendukung RouteAware
+      const AccountPage(),
+    ];
   }
 
   Future<void> _loadNavIndex() async {

@@ -4,10 +4,10 @@ import '../models/product.dart';
 import 'detail_page.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
+import '../services/product_service.dart';
 
 class HomePage extends StatefulWidget {
-  final List<Product> products;
-  const HomePage({super.key, required this.products});
+  const HomePage({super.key});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -20,6 +20,8 @@ class _HomePageState extends State<HomePage> {
     'sepatu',
     'aksesoris',
   ];
+  late Future<List<Product>> _productFuture;
+  String? _selectedCategory;
 
   late ScrollController _scrollController;
   bool _showCategories = false; // 🔧 default tertutup
@@ -30,20 +32,24 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _scrollController = ScrollController();
+    _productFuture = ProductService().fetchProducts();
 
     _scrollController.addListener(() {
       double currentOffset = _scrollController.offset;
-
-      // Scroll ke bawah ➜ sembunyikan
       if (currentOffset > _lastOffset && _showCategories) {
         setState(() {
           _showCategories = false;
           _forceHideCategoryByScroll = true;
         });
       }
-
-      // Scroll ke atas ➜ jangan tampilkan lagi otomatis
       _lastOffset = currentOffset;
+    });
+  }
+
+  void _filterByCategory(String kategori) {
+    setState(() {
+      _selectedCategory = kategori;
+      _productFuture = ProductService().fetchProducts(kategori: kategori);
     });
   }
 
@@ -147,28 +153,35 @@ class _HomePageState extends State<HomePage> {
                             child: Row(
                               children:
                                   categories.map((label) {
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                      ),
-                                      child: Column(
-                                        children: [
-                                          CircleAvatar(
-                                            radius: 26,
-                                            backgroundImage: AssetImage(
-                                              'assets/$label.jpg',
+                                    return GestureDetector(
+                                      onTap: () => _filterByCategory(label),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                        ),
+                                        child: Column(
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 26,
+                                              backgroundImage: AssetImage(
+                                                'assets/$label.jpg',
+                                              ),
                                             ),
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            label[0].toUpperCase() +
-                                                label.substring(1),
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.bold,
+                                            const SizedBox(height: 6),
+                                            Text(
+                                              label[0].toUpperCase() +
+                                                  label.substring(1),
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.bold,
+                                                color:
+                                                    _selectedCategory == label
+                                                        ? Colors.black
+                                                        : Colors.grey[700],
+                                              ),
                                             ),
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
                                     );
                                   }).toList(),
@@ -183,14 +196,33 @@ class _HomePageState extends State<HomePage> {
 
             // Produk Grid dari data langsung (tanpa FutureBuilder)
             SliverToBoxAdapter(
-              child: Builder(
-                builder: (context) {
-                  final products = widget.products;
+              child: FutureBuilder<List<Product>>(
+                future: _productFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.all(32),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+
+                  if (snapshot.hasError) {
+                    return Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Center(
+                        child: Text('Gagal memuat produk: ${snapshot.error}'),
+                      ),
+                    );
+                  }
+
+                  final products = snapshot.data ?? [];
 
                   if (products.isEmpty) {
                     return const Padding(
                       padding: EdgeInsets.all(16.0),
-                      child: Center(child: Text('Tidak ada produk.')),
+                      child: Center(
+                        child: Text('Tidak ada produk untuk kategori ini.'),
+                      ),
                     );
                   }
 
@@ -200,7 +232,8 @@ class _HomePageState extends State<HomePage> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: products.length,
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: screenWidth > 600 ? 3 : 2,
+                      crossAxisCount:
+                          MediaQuery.of(context).size.width > 600 ? 3 : 2,
                       crossAxisSpacing: 16,
                       mainAxisSpacing: 16,
                       childAspectRatio: 0.75,

@@ -19,6 +19,12 @@ class _ProductWrapperState extends State<ProductWrapper> {
     _productFuture = ProductService().fetchProducts();
   }
 
+  void _reloadProducts() {
+    setState(() {
+      _productFuture = ProductService().fetchProducts();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<Product>>(
@@ -30,15 +36,41 @@ class _ProductWrapperState extends State<ProductWrapper> {
           );
         } else if (snapshot.hasError) {
           return Scaffold(
-            body: Center(child: Text('Gagal memuat produk: ${snapshot.error}')),
+            body: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Gagal memuat produk:\n${snapshot.error}',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _reloadProducts,
+                    child: const Text("Coba Lagi"),
+                  ),
+                ],
+              ),
+            ),
           );
         } else {
           try {
             final List<Product> products = snapshot.data ?? [];
-            print('✅ Produk berhasil dimuat: ${products.length}');
-            return HomePage(products: products);
+            if (products.isEmpty) {
+              return const Scaffold(
+                body: Center(
+                  child: Text(
+                    'Belum ada produk tersedia',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                ),
+              );
+            }
+
+            debugPrint('✅ Produk berhasil dimuat: ${products.length}');
+            return const HomePage();
           } catch (e) {
-            print('❌ Error parsing produk: $e');
+            debugPrint('❌ Error parsing produk: $e');
             return const Scaffold(
               body: Center(
                 child: Text(

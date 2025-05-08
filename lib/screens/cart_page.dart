@@ -19,6 +19,7 @@ class CartPage extends StatefulWidget {
 
 class _CartPageState extends State<CartPage> {
   int? userId;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -27,18 +28,19 @@ class _CartPageState extends State<CartPage> {
   }
 
   Future<void> _loadCart() async {
+    setState(() => _isLoading = true);
+
     final prefs = await SharedPreferences.getInstance();
     userId = prefs.getInt('userId');
 
     if (userId != null) {
-      print('[CartPage] 🔄 Memuat keranjang untuk userId: $userId');
       await Provider.of<CartProvider>(
         context,
         listen: false,
       ).fetchCart(userId!);
-    } else {
-      print('[CartPage] ⚠️ userId tidak ditemukan di SharedPreferences!');
     }
+
+    setState(() => _isLoading = false);
   }
 
   String formatRupiah(dynamic value) {
@@ -70,7 +72,9 @@ class _CartPageState extends State<CartPage> {
               backgroundColor: Colors.black,
             ),
             body:
-                cartProvider.items.isEmpty
+                _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : cartProvider.items.isEmpty
                     ? const Center(
                       child: Text(
                         'Keranjang kosong',
@@ -311,7 +315,7 @@ class _CartPageState extends State<CartPage> {
                                 return (gambar != null &&
                                         gambar.toString().startsWith('http'))
                                     ? gambar
-                                    : 'http://10.0.2.2:8000/uploads/$gambar';
+                                    : 'https://secondpeace.my.id/uploads/$gambar';
                               })(),
                         },
                       )

@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 class Product {
   final int id;
   final String name;
@@ -6,6 +8,7 @@ class Product {
   final int stock;
   final String? size;
   final String? imageUrl;
+  final String? kategori; // ✅ Baru ditambahkan
 
   Product({
     required this.id,
@@ -15,6 +18,7 @@ class Product {
     this.stock = 0,
     this.size,
     this.imageUrl,
+    this.kategori, // ✅ Tambahkan ke konstruktor
   });
 
   /// Digunakan untuk dummy data lokal
@@ -26,42 +30,48 @@ class Product {
       price:
           (map['price'] is int)
               ? (map['price'] as int).toDouble()
-              : map['price'] ?? 0.0,
+              : double.tryParse(map['price'].toString()) ?? 0.0,
       stock: map['stock'] ?? 0,
       size: map['size'],
       imageUrl: map['image'],
+      kategori: map['kategori'], // ✅ Map lokal juga boleh
     );
   }
 
   /// Digunakan untuk data dari API Laravel
   factory Product.fromJson(Map<String, dynamic> json) {
-    print('🧩 JSON Produk: $json');
+    if (kDebugMode) debugPrint('🧩 JSON Produk: $json');
+
+    final rawImage = json['gambar'];
+    final imageUrl =
+        rawImage != null
+            ? (rawImage.toString().startsWith('http')
+                ? rawImage
+                : 'https://secondpeace.my.id/uploads/$rawImage')
+            : null;
 
     return Product(
       id: json['id_produk'] ?? json['id'] ?? 0,
       name: json['nama_produk'] ?? '-',
       description: json['deskripsi'] ?? '',
-      price: (json['harga'] ?? 0).toDouble(),
+      price: double.tryParse(json['harga'].toString()) ?? 0.0,
       stock: json['stok'] ?? 0,
       size: json['size'],
-      imageUrl:
-          json['gambar'] != null
-              ? (json['gambar'].toString().startsWith('http')
-                  ? json['gambar']
-                  : 'http://10.0.2.2:8000/uploads/${json['gambar']}')
-              : null,
+      imageUrl: imageUrl,
+      kategori: json['kategori_produk'], // ✅ Ambil dari backend
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'name': name,
-      'description': description,
-      'image_url': imageUrl,
-      'price': price,
-      'stock': stock,
+      'nama_produk': name,
+      'deskripsi': description,
+      'gambar': imageUrl,
+      'harga': price,
+      'stok': stock,
       'size': size,
+      'kategori_produk': kategori, // ✅ Tambahkan ke output
     };
   }
 }
