@@ -75,7 +75,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
     try {
       final response = await AuthService().updateProfile(
-        userId: userId!,
         nama: name,
         email: email,
         foto: _selectedImage,

@@ -14,13 +14,13 @@ class CartService {
     'Authorization': 'Bearer $token',
   };
 
-  /// 🔄 Ambil semua item keranjang untuk user tertentu
-  Future<List<dynamic>> fetchCartItems(int userId) async {
-    final url = Uri.parse('$baseUrl/keranjang/$userId');
+  /// 🔄 Ambil semua item keranjang (tanpa userId di URL)
+  Future<List<dynamic>> fetchCartItems() async {
+    final url = Uri.parse('$baseUrl/keranjang');
 
     if (kDebugMode) {
       print('[CartService] 🔽 GET: $url');
-      print('[CartService] Token digunakan: $token');
+      print('[CartService] Token: $token');
     }
 
     final response = await http.get(url, headers: headers);
@@ -34,21 +34,16 @@ class CartService {
       final data = jsonDecode(response.body);
       return data['keranjang'] ?? [];
     } else {
-      throw Exception('Gagal mengambil data keranjang\n${response.body}');
+      throw Exception('Gagal mengambil keranjang\n${response.body}');
     }
   }
 
   /// ➕ Tambah produk ke keranjang
-  Future<void> addToCart({
-    required int userId,
+  Future<Map<String, dynamic>> addToCart({
     required int produkId,
     required int jumlah,
   }) async {
-    final body = jsonEncode({
-      'id_user': userId,
-      'id_produk': produkId,
-      'jumlah': jumlah,
-    });
+    final body = jsonEncode({'id_produk': produkId, 'jumlah': jumlah});
 
     final url = Uri.parse('$baseUrl/keranjang');
 
@@ -64,16 +59,18 @@ class CartService {
       print('[CartService] Response: ${response.body}');
     }
 
-    if (response.statusCode != 200) {
-      throw Exception('Gagal menambahkan ke keranjang\n${response.body}');
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return jsonDecode(response.body);
     }
 
     if (response.statusCode == 409) {
-      throw Exception('409');
+      return {'success': false, 'message': 'Produk sudah ada di keranjang.'};
     }
+
+    throw Exception('Gagal menambahkan ke keranjang\n${response.body}');
   }
 
-  /// ❌ Hapus produk dari keranjang
+  /// ❌ Hapus item keranjang
   Future<void> removeFromCart(int keranjangId) async {
     final url = Uri.parse('$baseUrl/keranjang/$keranjangId');
 

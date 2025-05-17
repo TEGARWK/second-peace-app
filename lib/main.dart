@@ -44,7 +44,7 @@ class MyApp extends StatelessWidget {
         final isLoggedIn = token.isNotEmpty;
 
         final cartService = CartService(
-          baseUrl: 'https://secondpeace.my.id/api',
+          baseUrl: 'https://secondpeace.my.id/api/v1',
           token: token,
         );
 
@@ -80,7 +80,8 @@ class SecondPeaceApp extends StatelessWidget {
       ],
       supportedLocales: const [Locale('id', 'ID'), Locale('en', 'US')],
       navigatorObservers: [routeObserver], // ✅ tambahkan ini
-      initialRoute: isLoggedIn ? '/main' : '/register',
+      initialRoute: isLoggedIn ? '/' : '/login', // ✅ agar login dulu
+
       routes: {
         '/': (context) => const MainScreen(),
         '/main': (context) => const MainScreen(),
@@ -118,12 +119,25 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    _checkAuthStatus();
     _loadNavIndex();
     _pages = [
       ProductWrapper(),
       const OrdersPage(), // ✅ OrdersPage sudah mendukung RouteAware
       const AccountPage(),
     ];
+  }
+
+  Future<void> _checkAuthStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+    if (!isLoggedIn) {
+      if (mounted) {
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil('/login', (route) => false);
+      }
+    }
   }
 
   Future<void> _loadNavIndex() async {

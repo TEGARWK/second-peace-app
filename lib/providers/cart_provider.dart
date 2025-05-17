@@ -22,27 +22,47 @@ class CartProvider extends ChangeNotifier {
       _cartItems.every((item) => item['selected'] == true);
 
   /// 🔄 Ambil data keranjang dari backend
-  Future<void> fetchCart(int userId) async {
-    if (userId == null) {
-      debugPrint('⚠️ fetchCart dibatalkan karena userId null');
-      return;
-    }
-
+  Future<void> fetchCart() async {
     try {
-      final data = await cartService.fetchCartItems(userId);
+      final data = await cartService.fetchCartItems();
+
       _cartItems =
-          data
-              .map<Map<String, dynamic>>((item) => {...item, 'selected': true})
-              .toList();
+          data.map<Map<String, dynamic>>((item) {
+            final produk = item['produk'];
+
+            if (produk == null) {
+              return {
+                ...item,
+                'jumlah': 1,
+                'selected': false,
+                'is_sold': true,
+                'produk': null,
+              };
+            }
+
+            final stok = int.tryParse(produk['stok']?.toString() ?? '0') ?? 0;
+            final harga = int.tryParse(produk['harga']?.toString() ?? '0') ?? 0;
+            final jumlah = int.tryParse(item['jumlah']?.toString() ?? '1') ?? 1;
+
+            final isSold = stok < 1;
+
+            return {
+              ...item,
+              'jumlah': jumlah,
+              'selected': !isSold,
+              'is_sold': isSold,
+              'produk': {...produk, 'stok': stok, 'harga': harga},
+            };
+          }).toList();
+
       notifyListeners();
     } catch (e) {
-      debugPrint('❌ Error fetchCart: $e');
+      debugPrint('❌ Gagal fetch cart: $e');
     }
   }
 
-  /// ➕ Tambah item ke keranjang (dengan pengecekan duplikat)
+  /// ➕ Tambah item ke keranjang
   Future<void> addItem({
-    required int userId,
     required int produkId,
     required int jumlah,
     required String name,
@@ -50,57 +70,49 @@ class CartProvider extends ChangeNotifier {
     required int harga,
   }) async {
     try {
-      // ✅ Cek apakah produk sudah ada di keranjang
       final alreadyInCart = _cartItems.any((item) {
         final itemProduk = item['produk'];
         return itemProduk != null && itemProduk['id_produk'] == produkId;
       });
 
-      if (alreadyInCart) {
-        debugPrint('⚠️ Produk ini sudah ada di keranjang!');
-        throw Exception('Produk ini sudah ada di keranjang');
-      }
+      if (alreadyInCart) throw Exception('Produk ini sudah ada di keranjang');
 
-      debugPrint(
-        '[CartProvider] ➕ Tambah produk ID: $produkId untuk user $userId',
-      );
-      await cartService.addToCart(
-        userId: userId,
-        produkId: produkId,
-        jumlah: jumlah,
-      );
-      await fetchCart(userId);
+      await cartService.addToCart(produkId: produkId, jumlah: jumlah);
+      await fetchCart();
     } catch (e) {
-      debugPrint('❌ Error addItem: $e');
+      debugPrint('❌ Gagal menambahkan item ke keranjang: $e');
       rethrow;
     }
   }
 
   /// ❌ Hapus item dari keranjang
-  Future<void> removeItem(int keranjangId, int userId) async {
+  Future<void> removeItem(int keranjangId) async {
     try {
       await cartService.removeFromCart(keranjangId);
-      await fetchCart(userId);
+      await fetchCart();
     } catch (e) {
-      debugPrint('Error removeItem: $e');
+      debugPrint('❌ Gagal menghapus item dari keranjang: $e');
     }
   }
 
-  /// ✅ Toggle pilih item
+  /// ✅ Toggle satu item
   void toggleSelect(int index) {
+    if (_cartItems[index]['is_sold'] == true) return;
     _cartItems[index]['selected'] = !_cartItems[index]['selected'];
     notifyListeners();
   }
 
-  /// ✅ Pilih semua / batal semua
+  /// ✅ Toggle semua item
   void toggleSelectAll(bool value) {
     for (var item in _cartItems) {
-      item['selected'] = value;
+      if (item['is_sold'] != true) {
+        item['selected'] = value;
+      }
     }
     notifyListeners();
   }
 
-  /// 💰 Total harga item terpilih
+  /// 💰 Total harga semua item terpilih
   int get getTotalPrice {
     return _cartItems.fold<int>(0, (sum, item) {
       final harga = (item['produk']?['harga'] ?? 0) as num;
@@ -109,7 +121,7 @@ class CartProvider extends ChangeNotifier {
     });
   }
 
-  /// 🔢 Total qty item terpilih
+  /// 🔢 Total jumlah qty item terpilih
   int getTotalQty() {
     return _cartItems.fold<int>(0, (sum, item) {
       final qty = (item['jumlah'] ?? 1) as int;
@@ -117,7 +129,7 @@ class CartProvider extends ChangeNotifier {
     });
   }
 
-  /// ✅ Update token setelah login
+  /// 🔄 Update token saat login/register
   void updateToken(String newToken) {
     cartService = CartService(baseUrl: cartService.baseUrl, token: newToken);
     notifyListeners();

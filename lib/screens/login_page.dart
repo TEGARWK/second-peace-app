@@ -58,7 +58,7 @@ class _LoginPageState extends State<LoginPage> {
           await Provider.of<CartProvider>(
             context,
             listen: false,
-          ).fetchCart(user['id']);
+          ).fetchCart(); // ✅ tanpa userId
         } catch (e) {
           debugPrint("Gagal memuat cart: $e");
         }

@@ -1,3 +1,4 @@
+// Revisi: order_detail_unpaid_page.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -7,6 +8,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 class OrderDetailUnpaidPage extends StatelessWidget {
   final Map<String, dynamic> order;
   final String tabStatus;
+
+  const OrderDetailUnpaidPage({
+    super.key,
+    required this.order,
+    required this.tabStatus,
+  });
+
+  // Util konversi
+  double parseToDouble(dynamic value) {
+    return (value is num)
+        ? value.toDouble()
+        : double.tryParse(value.toString()) ?? 0.0;
+  }
 
   Future<void> cancelOrder(BuildContext context, int idPesanan) async {
     final prefs = await SharedPreferences.getInstance();
@@ -22,8 +36,8 @@ class OrderDetailUnpaidPage extends StatelessWidget {
     }
 
     final uri = Uri.parse(
-      'https://yourdomain.com/api/pesanan/$idPesanan/cancel',
-    ); // Ganti URL sesuai route
+      'https://secondpeace.my.id/api/v1/pesanan/$idPesanan/cancel',
+    );
     try {
       final response = await http.patch(
         uri,
@@ -37,11 +51,11 @@ class OrderDetailUnpaidPage extends StatelessWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Pesanan berhasil dibatalkan')),
         );
-        Navigator.pop(context); // kembali ke halaman sebelumnya
+        Navigator.pop(context);
       } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Gagal membatalkan pesanan')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal membatalkan pesanan')),
+        );
       }
     } catch (e) {
       ScaffoldMessenger.of(
@@ -49,12 +63,6 @@ class OrderDetailUnpaidPage extends StatelessWidget {
       ).showSnackBar(SnackBar(content: Text('Terjadi kesalahan: $e')));
     }
   }
-
-  const OrderDetailUnpaidPage({
-    super.key,
-    required this.order,
-    required this.tabStatus,
-  });
 
   String formatCurrency(num amount) {
     final formatter = NumberFormat.currency(
@@ -79,12 +87,14 @@ class OrderDetailUnpaidPage extends StatelessWidget {
     final List<Map<String, dynamic>> items = List<Map<String, dynamic>>.from(
       order['detail_pesanan'] ?? [],
     );
-    final String tanggalPesan = order['tanggal_pesan'] ?? '-';
+    final String tanggalPesan = order['tanggal'] ?? '-';
     final String expiredAt = order['expired_at'] ?? '';
-    final double total =
-        (order['total_harga'] is num)
-            ? order['total_harga'].toDouble()
-            : double.tryParse(order['total_harga'].toString()) ?? 0.0;
+    final double total = parseToDouble(order['grand_total']);
+
+    final alamatData = order['alamat'] ?? {};
+    final String alamatLengkap = alamatData['alamat'] ?? '-';
+    final String penerima = alamatData['nama'] ?? '-';
+    final String whatsapp = alamatData['no_whatsapp'] ?? '-';
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -93,7 +103,7 @@ class OrderDetailUnpaidPage extends StatelessWidget {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         title: Text(
-          "Pesanan #${order['id_pesanan'] ?? '-'}",
+          "Pesanan #\${order['id_pesanan'] ?? '-'}",
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
@@ -111,16 +121,15 @@ class OrderDetailUnpaidPage extends StatelessWidget {
                 const SizedBox(height: 20),
                 _buildSectionTitle("📦 Informasi Pengiriman"),
                 _buildShippingInfo(
-                  penerima: order['penerima'] ?? '-',
-                  alamat: order['alamat'] ?? '-',
-                  whatsapp: order['no_whatsapp'] ?? '-',
+                  penerima: penerima,
+                  alamat: alamatLengkap,
+                  whatsapp: whatsapp,
                   tanggal: tanggalPesan,
                 ),
                 const SizedBox(height: 20),
                 _buildSectionTitle("💳 Informasi Pembayaran"),
                 _buildPaymentInfo(
                   metode: order['metode_pembayaran'] ?? 'Transfer Bank',
-                  catatan: order['catatan'] ?? 'Tidak ada',
                 ),
               ],
             ),
@@ -131,58 +140,58 @@ class OrderDetailUnpaidPage extends StatelessWidget {
     );
   }
 
-  Widget _buildAntrianNotice(String expiredAt) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.red[50],
-        border: Border.all(color: Colors.red),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: const [
-              Icon(Icons.warning_amber, color: Colors.red),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  "Karena ini produk preloved, hanya tersedia 1 item. Siapa yang membayar lebih dulu akan mendapatkannya.",
-                  style: TextStyle(color: Colors.red, fontSize: 13),
-                ),
+  Widget _buildAntrianNotice(String expiredAt) => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.red[50],
+      border: Border.all(color: Colors.red),
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: const [
+            Icon(Icons.warning_amber, color: Colors.red),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                "Karena ini produk preloved...",
+                style: TextStyle(color: Colors.red, fontSize: 13),
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              const Icon(Icons.timer_outlined, color: Colors.red),
-              const SizedBox(width: 8),
-              Text(
-                "Batas bayar: ${formatDateTime(expiredAt)}",
-                style: const TextStyle(fontSize: 13, color: Colors.red),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            const Icon(Icons.timer_outlined, color: Colors.red),
+            const SizedBox(width: 8),
+            Text(
+              "Batas bayar: \${formatDateTime(expiredAt)}",
+              style: const TextStyle(fontSize: 13, color: Colors.red),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
 
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-    );
-  }
+  Widget _buildSectionTitle(String title) => Text(
+    title,
+    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+  );
 
   Widget _buildProductItem(Map<String, dynamic> item) {
-    final nama = item['nama_produk'] ?? '-';
+    final produk = item['produk'] ?? {};
+    final nama =
+        produk.isEmpty ? 'Produk telah dihapus' : produk['nama_produk'] ?? '-';
     final jumlah = item['jumlah'] ?? 0;
-    final harga = item['harga'] ?? 0;
-    final ukuran = item['ukuran'] ?? '-';
-    final gambar = item['gambar'] ?? '';
+    final harga = parseToDouble(produk['harga']);
+    final ukuran = produk['size'] ?? '-';
+    final gambar = produk['gambar'] ?? '';
+    const baseUrl = 'https://secondpeace.my.id/uploads/';
+    final fullImageUrl = gambar.isNotEmpty ? '$baseUrl$gambar' : '';
 
     return Card(
       elevation: 2,
@@ -191,30 +200,22 @@ class OrderDetailUnpaidPage extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child:
-                  gambar.isNotEmpty
+                  fullImageUrl.isNotEmpty
                       ? Image.network(
-                        gambar,
+                        fullImageUrl,
                         width: 70,
                         height: 70,
                         fit: BoxFit.cover,
-                        errorBuilder:
-                            (context, error, stackTrace) => Container(
-                              width: 70,
-                              height: 70,
-                              color: Colors.grey[300],
-                              child: const Icon(Icons.broken_image),
-                            ),
                       )
                       : Container(
                         width: 70,
                         height: 70,
                         color: Colors.grey[300],
-                        child: const Icon(Icons.image),
+                        child: const Icon(Icons.image_not_supported),
                       ),
             ),
             const SizedBox(width: 12),
@@ -233,10 +234,10 @@ class OrderDetailUnpaidPage extends StatelessWidget {
                   Text("Jumlah: $jumlah"),
                   Text("Ukuran: $ukuran"),
                   Text(
-                    "Harga: ${formatCurrency(harga)}",
+                    "Harga: \${formatCurrency(harga)}",
                     style: const TextStyle(
-                      fontWeight: FontWeight.w500,
                       color: Colors.red,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
@@ -253,84 +254,68 @@ class OrderDetailUnpaidPage extends StatelessWidget {
     required String alamat,
     required String whatsapp,
     required String tanggal,
-  }) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.person_outline),
-                const SizedBox(width: 8),
-                Text("Penerima: $penerima"),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                const Icon(Icons.phone_android),
-                const SizedBox(width: 8),
-                Text("WhatsApp: $whatsapp"),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                const Icon(Icons.location_on_outlined),
-                const SizedBox(width: 8),
-                Flexible(child: Text("Alamat: $alamat")),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                const Icon(Icons.access_time),
-                const SizedBox(width: 8),
-                Text("Tanggal Pesan: $tanggal"),
-              ],
-            ),
-          ],
-        ),
+  }) => Card(
+    elevation: 2,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    child: Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.person_outline),
+              const SizedBox(width: 8),
+              Text("Penerima: $penerima"),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Icon(Icons.phone_android),
+              const SizedBox(width: 8),
+              Text("WhatsApp: $whatsapp"),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Icon(Icons.location_on_outlined),
+              const SizedBox(width: 8),
+              Flexible(child: Text("Alamat: $alamat")),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Icon(Icons.access_time),
+              const SizedBox(width: 8),
+              Text("Tanggal Pesan: $tanggal"),
+            ],
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
 
-  Widget _buildPaymentInfo({required String metode, required String catatan}) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.payments_outlined),
-                const SizedBox(width: 8),
-                Text("Metode: $metode"),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                const Icon(Icons.edit_note),
-                const SizedBox(width: 8),
-                Text("Catatan: $catatan"),
-              ],
-            ),
-          ],
-        ),
+  Widget _buildPaymentInfo({required String metode}) => Card(
+    elevation: 2,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    child: Padding(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          const Icon(Icons.payments_outlined),
+          const SizedBox(width: 8),
+          Text("Metode: $metode"),
+        ],
       ),
-    );
-  }
+    ),
+  );
 
   Widget _buildBottomBar(double total, BuildContext context) {
-    final String paymentUrl = order['payment_url'] ?? '';
+    final snapToken = order['snap_token'];
+    final orderId = order['id_pembayaran'];
     final int idPesanan = order['id_pesanan'] ?? 0;
 
     return Container(
@@ -365,7 +350,6 @@ class OrderDetailUnpaidPage extends StatelessWidget {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () => cancelOrder(context, idPesanan),
-
                   icon: const Icon(Icons.cancel_outlined, color: Colors.red),
                   label: const Text(
                     "Batalkan Pesanan",
@@ -380,6 +364,24 @@ class OrderDetailUnpaidPage extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: ElevatedButton(
+                  onPressed: () {
+                    if (snapToken != null && orderId != null) {
+                      Navigator.pushNamed(
+                        context,
+                        '/snap',
+                        arguments: {
+                          'snap_token': snapToken,
+                          'order_id': orderId,
+                        },
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Snap token tidak ditemukan'),
+                        ),
+                      );
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.black87,
                     shape: RoundedRectangleBorder(
@@ -387,23 +389,6 @@ class OrderDetailUnpaidPage extends StatelessWidget {
                     ),
                     minimumSize: const Size(double.infinity, 45),
                   ),
-                  onPressed: () async {
-                    if (paymentUrl.isNotEmpty &&
-                        await canLaunchUrl(Uri.parse(paymentUrl))) {
-                      await launchUrl(
-                        Uri.parse(paymentUrl),
-                        mode: LaunchMode.externalApplication,
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Link pembayaran tidak tersedia atau gagal dibuka',
-                          ),
-                        ),
-                      );
-                    }
-                  },
                   child: const Text(
                     'Bayar Sekarang',
                     style: TextStyle(fontSize: 16, color: Colors.white),

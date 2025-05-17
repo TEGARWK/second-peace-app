@@ -4,13 +4,12 @@ import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-// Import halaman detail
 import 'order_detail_unpaid_page.dart';
 import 'order_detail_processing_page.dart';
-import 'order_detail_shipped_page.dart';
-import 'order_detail_received_page.dart';
+import 'order_detail_shipped_page.dart' as pageShipped;
+import 'order_detail_received_page.dart' as pageReceived;
+import 'order_detail_cancelled_page.dart';
 
-// Import Route Observer (pastikan ini diset di main.dart)
 final RouteObserver<ModalRoute<void>> routeObserver =
     RouteObserver<ModalRoute<void>>();
 
@@ -39,6 +38,7 @@ class _OrdersPageState extends State<OrdersPage>
   void initState() {
     super.initState();
     _loadUserOrders();
+    _pollForUpdatedOrders(); // Mulai polling setelah inisialisasi
   }
 
   @override
@@ -55,10 +55,11 @@ class _OrdersPageState extends State<OrdersPage>
 
   @override
   void didPopNext() {
-    _loadUserOrders(); // Auto-refresh ketika kembali dari SnapWebView
+    _loadUserOrders(); // Reload setelah kembali ke halaman
   }
 
   String mapStatusToTab(String backendStatus) {
+    print('🔥 status dari backend: $backendStatus');
     switch (backendStatus) {
       case 'Menunggu Pembayaran':
         return 'Belum Bayar';
@@ -80,11 +81,13 @@ class _OrdersPageState extends State<OrdersPage>
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
 
+    print('🔑 TOKEN SAAT REQUEST: $token');
+
     if (token == null) return;
 
     try {
       final response = await http.get(
-        Uri.parse('https://secondpeace.my.id/api/pesanan'),
+        Uri.parse('https://secondpeace.my.id/api/v1/pesanan'),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -95,13 +98,18 @@ class _OrdersPageState extends State<OrdersPage>
         final data = jsonDecode(response.body);
         final List orders = data['pesanan'];
 
-        setState(() {
-          unpaid = _filterOrders(orders, 'Belum Bayar');
-          processing = _filterOrders(orders, 'Diproses');
-          shipped = _filterOrders(orders, 'Dikirim');
-          received = _filterOrders(orders, 'Selesai');
-          cancelled = _filterOrders(orders, 'Dibatalkan');
-        });
+        print('📦 total pesanan diterima: ${orders.length}');
+
+        // Periksa jika widget masih terpasang sebelum melakukan update state
+        if (mounted) {
+          setState(() {
+            unpaid = _filterOrders(orders, 'Belum Bayar');
+            processing = _filterOrders(orders, 'Diproses');
+            shipped = _filterOrders(orders, 'Dikirim');
+            received = _filterOrders(orders, 'Selesai');
+            cancelled = _filterOrders(orders, 'Dibatalkan');
+          });
+        }
       } else {
         print('Gagal memuat pesanan: ${response.body}');
       }
@@ -112,9 +120,58 @@ class _OrdersPageState extends State<OrdersPage>
 
   List<Map<String, dynamic>> _filterOrders(List orders, String statusTab) {
     return orders
-        .where((o) => mapStatusToTab(o['status_pesanan']) == statusTab)
+        .where((o) {
+          final mapped = mapStatusToTab(o['status_pesanan']);
+          print('📍 status_pesanan: ${o['status_pesanan']} ➜ tab: $mapped');
+          return mapped == statusTab;
+        })
         .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
         .toList();
+  }
+
+  // Polling untuk memeriksa status pesanan secara periodik
+  Future<void> _pollForUpdatedOrders() async {
+    while (true) {
+      // Pastikan widget masih terpasang sebelum memanggil _loadUserOrders
+      if (!mounted) return;
+
+      await _loadUserOrders();
+      await Future.delayed(Duration(seconds: 10)); // Polling setiap 10 detik
+    }
+  }
+
+  Future<void> _updateOrderStatus(
+    String orderId,
+    String newStatus,
+    String resi,
+  ) async {
+    final response = await http.put(
+      Uri.parse('https://secondpeace.my.id/api/v1/pesanan/$orderId'),
+      headers: {
+        'Authorization': 'Bearer YOUR_TOKEN_HERE',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'status': newStatus, 'resi': resi}),
+    );
+
+    if (response.statusCode == 200) {
+      // Update status di local list setelah status diperbarui
+      if (mounted) {
+        setState(() {
+          // Ganti 'processing' dengan daftar yang sesuai (misalnya 'unpaid', 'shipped', etc.)
+          final updatedOrder = processing.firstWhere(
+            (order) => order['id_pesanan'] == orderId,
+          );
+          updatedOrder['status_pesanan'] = newStatus;
+          updatedOrder['nomor_resi'] = resi;
+        });
+      }
+
+      // Refresh data setelah perubahan
+      _loadUserOrders();
+    } else {
+      throw Exception('Failed to update order status');
+    }
   }
 
   @override
@@ -200,6 +257,11 @@ class _OrdersPageState extends State<OrdersPage>
             order['detail_pesanan'] ?? [],
           );
           final firstItem = items.isNotEmpty ? items[0] : null;
+          final produk = firstItem?['produk'];
+          final namaProduk =
+              produk != null
+                  ? produk['nama_produk'] ?? 'Produk tidak ditemukan'
+                  : 'Produk tidak ditemukan';
 
           final additionalCount = (items.length - 1).clamp(0, items.length);
           final totalItems = items.fold<int>(0, (sum, item) {
@@ -207,16 +269,8 @@ class _OrdersPageState extends State<OrdersPage>
             return sum + (qty is int ? qty : int.tryParse(qty.toString()) ?? 0);
           });
 
-          final totalHarga = items.fold<num>(0, (sum, item) {
-            return sum + ((item['harga'] ?? 0) * (item['jumlah'] ?? 1));
-          });
-
-          final formattedDate = DateFormat(
-            'd MMMM yyyy, HH:mm',
-            'id_ID',
-          ).format(
-            DateTime.tryParse(order['tanggal_pesan'] ?? '') ?? DateTime.now(),
-          );
+          final totalHarga = order['grand_total'] ?? 0;
+          final formattedDate = order['tanggal'] ?? '-';
 
           return GestureDetector(
             onTap: () => _navigateToDetailPage(order, status),
@@ -252,7 +306,7 @@ class _OrdersPageState extends State<OrdersPage>
                     const Divider(height: 20),
                     if (firstItem != null)
                       Text(
-                        "🧥 ${firstItem['nama_produk']} x${firstItem['jumlah']}",
+                        "🧥 $namaProduk x${firstItem['jumlah'] ?? 0}",
                         style: const TextStyle(fontSize: 14),
                       ),
                     if (additionalCount > 0)
@@ -312,12 +366,18 @@ class _OrdersPageState extends State<OrdersPage>
         detailPage = OrderDetailProcessingPage(order: order, tabStatus: status);
         break;
       case 'Dikirim':
-        detailPage = OrderDetailShippedPage(order: order, tabStatus: status);
+        detailPage = pageShipped.OrderDetailShippedPage(order: order);
         break;
       case 'Selesai':
+        detailPage = pageReceived.OrderDetailReceivedPage(order: order);
+        break;
+      case 'Dibatalkan':
+        detailPage = OrderDetailCancelledPage(order: order);
+        break;
       default:
-        detailPage = OrderDetailReceivedPage(order: order);
+        detailPage = OrderDetailProcessingPage(order: order, tabStatus: status);
     }
+
     Navigator.push(context, MaterialPageRoute(builder: (_) => detailPage));
   }
 

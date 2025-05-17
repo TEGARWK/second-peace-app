@@ -8,7 +8,7 @@ class Product {
   final int stock;
   final String? size;
   final String? imageUrl;
-  final String? kategori; // ✅ Baru ditambahkan
+  final String? kategori;
 
   Product({
     required this.id,
@@ -18,27 +18,10 @@ class Product {
     this.stock = 0,
     this.size,
     this.imageUrl,
-    this.kategori, // ✅ Tambahkan ke konstruktor
+    this.kategori,
   });
 
-  /// Digunakan untuk dummy data lokal
-  factory Product.fromMap(Map<String, dynamic> map) {
-    return Product(
-      id: map['id'],
-      name: map['name'],
-      description: map['description'] ?? '',
-      price:
-          (map['price'] is int)
-              ? (map['price'] as int).toDouble()
-              : double.tryParse(map['price'].toString()) ?? 0.0,
-      stock: map['stock'] ?? 0,
-      size: map['size'],
-      imageUrl: map['image'],
-      kategori: map['kategori'], // ✅ Map lokal juga boleh
-    );
-  }
-
-  /// Digunakan untuk data dari API Laravel
+  /// Untuk data dari API Laravel
   factory Product.fromJson(Map<String, dynamic> json) {
     if (kDebugMode) debugPrint('🧩 JSON Produk: $json');
 
@@ -52,26 +35,34 @@ class Product {
 
     return Product(
       id: json['id_produk'] ?? json['id'] ?? 0,
-      name: json['nama_produk'] ?? '-',
-      description: json['deskripsi'] ?? '',
-      price: double.tryParse(json['harga'].toString()) ?? 0.0,
-      stock: json['stok'] ?? 0,
+      name: json['nama_produk'] ?? json['name'] ?? '-',
+      description: json['deskripsi'] ?? json['description'] ?? '',
+      price: _toDouble(json['harga']),
+      stock: int.tryParse(json['stok'].toString()) ?? 0,
       size: json['size'],
       imageUrl: imageUrl,
-      kategori: json['kategori_produk'], // ✅ Ambil dari backend
+      kategori: json['kategori_produk'] ?? json['kategori'],
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
+      'id_produk': id,
       'nama_produk': name,
       'deskripsi': description,
       'gambar': imageUrl,
       'harga': price,
       'stok': stock,
       'size': size,
-      'kategori_produk': kategori, // ✅ Tambahkan ke output
+      'kategori_produk': kategori,
     };
+  }
+
+  /// Utility converter
+  static double _toDouble(dynamic val) {
+    if (val == null) return 0.0;
+    if (val is int) return val.toDouble();
+    if (val is double) return val;
+    return double.tryParse(val.toString()) ?? 0.0;
   }
 }

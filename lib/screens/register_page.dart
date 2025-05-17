@@ -79,21 +79,22 @@ class _RegisterPageState extends State<RegisterPage> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('isLoggedIn', true);
         await prefs.setString('token', response['token']);
-        await prefs.setInt('userId', response['user']['id']);
         await prefs.setString('userName', response['user']['nama']);
         await prefs.setString('userEmail', response['user']['email']);
         await prefs.setInt('navIndex', 2);
 
-        // ✅ Tambahkan ini agar CartProvider dapat token terbaru
         Provider.of<CartProvider>(
           context,
           listen: false,
         ).updateToken(response['token']);
 
+        await Provider.of<CartProvider>(
+          context,
+          listen: false,
+        ).fetchCart(); // ✅ Tambahkan ini
+
         if (mounted) {
-          Navigator.of(
-            context,
-          ).pushNamedAndRemoveUntil('/main', (route) => false);
+          Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
         }
       } else {
         setState(() {

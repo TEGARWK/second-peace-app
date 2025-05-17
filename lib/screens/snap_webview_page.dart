@@ -22,13 +22,15 @@ class _SnapWebViewPageState extends State<SnapWebViewPage> {
   late final WebViewController _controller;
   bool isLoading = true;
   bool paymentSuccess = false;
-  final bool useProduction = false; // ⛔ Set ke false jika masih pakai sandbox
+  final bool useProduction = false;
   bool tokenValid = true;
+  String statusMessage = "Mengecek status pembayaran...";
 
   @override
   void initState() {
     super.initState();
     _initWebView();
+    Future.delayed(const Duration(seconds: 5), _startAutoCheck);
   }
 
   void _initWebView() {
@@ -55,57 +57,47 @@ class _SnapWebViewPageState extends State<SnapWebViewPage> {
               onWebResourceError: (error) {
                 print("❌ Web error: ${error.description}");
               },
-              onNavigationRequest: (request) {
-                final url = request.url;
-                print('[WEBVIEW] Navigating to: $url');
-
-                if (url.contains('finish') || url.contains('status=success')) {
-                  _handleSukses();
-                  return NavigationDecision.prevent;
-                }
-
-                if (url.contains('unfinish') || url.contains('error')) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Pembayaran dibatalkan atau gagal'),
-                    ),
-                  );
-                  Navigator.pop(context);
-                  return NavigationDecision.prevent;
-                }
-
-                return NavigationDecision.navigate;
-              },
             ),
           )
           ..loadRequest(Uri.parse(fullUrl));
+  }
+
+  void _startAutoCheck() async {
+    if (!mounted || paymentSuccess) return;
+    await _cekStatusPembayaran();
+
+    if (!paymentSuccess && mounted) {
+      Future.delayed(const Duration(seconds: 5), _startAutoCheck);
+    }
   }
 
   Future<void> _handleSukses() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('navIndex', 1);
 
-    setState(() => paymentSuccess = true);
+    setState(() {
+      paymentSuccess = true;
+      statusMessage = "Pembayaran berhasil! Mengarahkan...";
+    });
+
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text("Pembayaran berhasil!")));
 
-    await Future.delayed(const Duration(seconds: 1));
+    await Future.delayed(const Duration(seconds: 2));
     if (mounted) {
       Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
     }
   }
 
   Future<void> _cekStatusPembayaran() async {
-    setState(() => isLoading = true);
-
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
 
       final response = await http.get(
         Uri.parse(
-          'https://secondpeace.my.id/api/verify-payment/${widget.orderId}',
+          'https://secondpeace.my.id/api/v1/verify-payment/${widget.orderId}',
         ),
         headers: {
           'Authorization': 'Bearer $token',
@@ -113,24 +105,29 @@ class _SnapWebViewPageState extends State<SnapWebViewPage> {
         },
       );
 
-      final data = jsonDecode(response.body);
-      print('[CEK STATUS] response: $data');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print('[CEK STATUS] response: $data');
 
-      if (data['status'] == 'settlement') {
-        await _handleSukses();
+        if (data['status'] == 'settlement') {
+          await _handleSukses();
+        } else {
+          setState(() {
+            statusMessage = 'Status saat ini: ${data['status']}';
+          });
+        }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Status Pembayaran: ${data['status']}')),
-        );
+        print('❌ Gagal verifikasi status pembayaran: ${response.statusCode}');
+        setState(() {
+          statusMessage = 'Gagal verifikasi status pembayaran';
+        });
       }
     } catch (e) {
-      print('❌ Gagal cek status: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gagal cek status pembayaran')),
-      );
+      print('❌ Error cek status: $e');
+      setState(() {
+        statusMessage = 'Gagal cek status pembayaran';
+      });
     }
-
-    setState(() => isLoading = false);
   }
 
   @override
@@ -176,16 +173,15 @@ class _SnapWebViewPageState extends State<SnapWebViewPage> {
               padding: const EdgeInsets.all(12),
               width: double.infinity,
               color: Colors.white,
-              child: ElevatedButton(
-                onPressed: _cekStatusPembayaran,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: const Text(
-                  "Cek Status Pembayaran",
-                  style: TextStyle(color: Colors.white),
-                ),
+              child: Column(
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 10),
+                  Text(
+                    statusMessage,
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                ],
               ),
             ),
         ],

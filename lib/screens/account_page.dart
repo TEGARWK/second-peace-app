@@ -7,6 +7,8 @@ import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../services/order_service.dart'; // pastikan ada file ini untuk ambil data dari API
 import 'orders_page.dart'; // pastikan file ini ada dan memiliki OrdersPage widget
+import 'chat_page.dart';
+import '../services/chat_service.dart';
 
 class AccountPage extends StatefulWidget {
   const AccountPage({super.key});
@@ -17,6 +19,7 @@ class AccountPage extends StatefulWidget {
 
 class _AccountPageState extends State<AccountPage> {
   bool isLoggedIn = false;
+  bool hasUnreadChat = false;
   String? userName;
   String? userEmail;
 
@@ -32,6 +35,7 @@ class _AccountPageState extends State<AccountPage> {
   void initState() {
     super.initState();
     _checkLoginStatus();
+    _checkUnreadMessages();
   }
 
   Future<void> _checkLoginStatus() async {
@@ -83,6 +87,19 @@ class _AccountPageState extends State<AccountPage> {
     await prefs.setInt('navIndex', 0);
     if (mounted) {
       Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+    }
+  }
+
+  Future<void> _checkUnreadMessages() async {
+    try {
+      final chatService = ChatService();
+      final result = await chatService.hasUnreadMessages();
+      if (!mounted) return;
+      setState(() {
+        hasUnreadChat = result;
+      });
+    } catch (e) {
+      print('❌ Gagal cek chat belum dibaca: $e');
     }
   }
 
@@ -169,10 +186,35 @@ class _AccountPageState extends State<AccountPage> {
         ),
       ),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.chat, color: Colors.white),
-          onPressed: () {},
+        Stack(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.chat, color: Colors.white),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ChatPage()),
+                ).then((_) {
+                  _checkUnreadMessages();
+                });
+              },
+            ),
+            if (hasUnreadChat)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+          ],
         ),
+
         Consumer<CartProvider>(
           builder: (context, cart, child) {
             return Stack(

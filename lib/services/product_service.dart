@@ -1,28 +1,31 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/product.dart';
 
-class ProductService {
-  final String baseUrl = 'https://secondpeace.my.id/api'; // ✅ DOMAIN hosting
+const String baseUrl = 'https://secondpeace.my.id/api/v1';
 
+class ProductService {
   Future<List<Product>> fetchProducts({String? kategori}) async {
     try {
-      final url = Uri.parse(
-        kategori != null
-            ? '$baseUrl/products?kategori=$kategori'
-            : '$baseUrl/products',
-      );
+      final uri =
+          kategori != null
+              ? Uri.parse('$baseUrl/products?kategori=$kategori')
+              : Uri.parse('$baseUrl/products');
 
       final response = await http.get(
-        url,
+        uri,
         headers: {'Accept': 'application/json'},
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final List<dynamic> productList = data['products'] ?? [];
-        return productList.map((json) => Product.fromJson(json)).toList();
+
+        // Fleksibel terhadap key 'data' atau 'products'
+        final productList = data['products'] ?? data['data'] ?? [];
+
+        return List<Product>.from(
+          productList.map((json) => Product.fromJson(json)),
+        );
       } else {
         throw Exception('Gagal memuat produk (${response.statusCode})');
       }

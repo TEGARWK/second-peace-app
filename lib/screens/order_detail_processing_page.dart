@@ -11,6 +11,11 @@ class OrderDetailProcessingPage extends StatelessWidget {
     required this.tabStatus,
   });
 
+  double parseToDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString()) ?? 0.0;
+  }
+
   String formatCurrency(num amount) {
     final formatter = NumberFormat.currency(
       locale: 'id_ID',
@@ -20,25 +25,33 @@ class OrderDetailProcessingPage extends StatelessWidget {
     return formatter.format(amount);
   }
 
-  String formatDateTime(String rawDateTime) {
+  String formatDateTime(String? rawDateTime) {
+    if (rawDateTime == null || rawDateTime.isEmpty) return '-';
     try {
       final dt = DateTime.parse(rawDateTime);
       return DateFormat('dd MMM yyyy HH:mm', 'id_ID').format(dt);
     } catch (_) {
-      return rawDateTime;
+      return '-';
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final List<Map<String, dynamic>> items = List<Map<String, dynamic>>.from(
-      order['detail_pesanan'] ?? [],
-    );
-    final String tanggalPesan = order['tanggal_pesan'] ?? '-';
+    final List<Map<String, dynamic>> items =
+        (order['detail_pesanan'] as List).map<Map<String, dynamic>>((e) {
+          return Map<String, dynamic>.from(e as Map);
+        }).toList();
+
     final String ekspedisi = order['ekspedisi'] ?? '-';
-    final String estimasiTiba = order['estimasi_tiba'] ?? '-';
-    final double total =
-        (order['total_harga'] is num) ? order['total_harga'].toDouble() : 0.0;
+    final String estimasiTiba = formatDateTime(order['estimasi_tiba'] ?? '');
+    final double total = parseToDouble(order['grand_total']);
+
+    final String tanggalPesan = formatDateTime(order['tanggal_pesan'] ?? '');
+
+    final alamatMap = order['alamat'] is Map ? order['alamat'] : {};
+    final String alamat = alamatMap['alamat'] ?? '-';
+    final String whatsapp = alamatMap['no_whatsapp'] ?? '-';
+    final String penerima = alamatMap['nama'] ?? '-';
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -65,18 +78,18 @@ class OrderDetailProcessingPage extends StatelessWidget {
                 const SizedBox(height: 20),
                 _buildSectionTitle("📦 Informasi Pengiriman"),
                 _buildShippingInfo(
-                  penerima: order['penerima'] ?? '-',
-                  alamat: order['alamat'] ?? '-',
-                  whatsapp: order['no_whatsapp'] ?? '-',
+                  penerima: penerima,
+                  alamat: alamat,
+                  whatsapp: whatsapp,
                   tanggal: tanggalPesan,
                   ekspedisi: ekspedisi,
                   estimasiTiba: estimasiTiba,
                 ),
+
                 const SizedBox(height: 20),
                 _buildSectionTitle("💳 Informasi Pembayaran"),
                 _buildPaymentInfo(
                   metode: order['metode_pembayaran'] ?? 'Transfer Bank',
-                  catatan: order['catatan'] ?? 'Tidak ada',
                 ),
               ],
             ),
@@ -118,11 +131,18 @@ class OrderDetailProcessingPage extends StatelessWidget {
   }
 
   Widget _buildProductItem(Map<String, dynamic> item) {
-    final nama = item['nama_produk'] ?? '-';
+    final produk = item['produk'] ?? {};
+    final nama =
+        produk is Map
+            ? (produk['nama_produk'] ?? 'Produk tidak ditemukan')
+            : 'Produk tidak ditemukan';
     final jumlah = item['jumlah'] ?? 0;
-    final harga = item['harga'] ?? 0;
-    final ukuran = item['ukuran'] ?? '-';
-    final gambar = item['gambar'] ?? '';
+    final harga = parseToDouble(produk['harga']);
+
+    final ukuran = produk['size'] ?? '-';
+    const baseUrl = 'https://secondpeace.my.id/uploads/';
+    final gambar = produk['gambar'] ?? '';
+    final fullImageUrl = gambar.isNotEmpty ? '$baseUrl$gambar' : '';
 
     return Card(
       elevation: 2,
@@ -136,14 +156,14 @@ class OrderDetailProcessingPage extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child:
-                  gambar.isNotEmpty
+                  fullImageUrl.isNotEmpty
                       ? Image.network(
-                        gambar,
+                        fullImageUrl,
                         width: 70,
                         height: 70,
                         fit: BoxFit.cover,
                         errorBuilder:
-                            (context, error, stackTrace) => Container(
+                            (_, __, ___) => Container(
                               width: 70,
                               height: 70,
                               color: Colors.grey[300],
@@ -154,7 +174,7 @@ class OrderDetailProcessingPage extends StatelessWidget {
                         width: 70,
                         height: 70,
                         color: Colors.grey[300],
-                        child: const Icon(Icons.image),
+                        child: const Icon(Icons.image_not_supported),
                       ),
             ),
             const SizedBox(width: 12),
@@ -257,7 +277,7 @@ class OrderDetailProcessingPage extends StatelessWidget {
     );
   }
 
-  Widget _buildPaymentInfo({required String metode, required String catatan}) {
+  Widget _buildPaymentInfo({required String metode}) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -274,13 +294,6 @@ class OrderDetailProcessingPage extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
-            Row(
-              children: [
-                const Icon(Icons.edit_note),
-                const SizedBox(width: 8),
-                Text("Catatan: $catatan"),
-              ],
-            ),
           ],
         ),
       ),
@@ -301,7 +314,7 @@ class OrderDetailProcessingPage extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Total Pembayaran',
+                'Total Pesanan',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
               ),
               Text(
@@ -319,6 +332,9 @@ class OrderDetailProcessingPage extends StatelessWidget {
             icon: const Icon(Icons.chat),
             label: const Text("Chat Toko"),
             style: ElevatedButton.styleFrom(
+              iconColor: Colors.white,
+              textStyle: const TextStyle(fontSize: 16),
+              foregroundColor: Colors.white,
               backgroundColor: Colors.black87,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),

@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class OrderDetailShippedPage extends StatelessWidget {
   final Map<String, dynamic> order;
-  final String tabStatus;
 
-  const OrderDetailShippedPage({
-    super.key,
-    required this.order,
-    required this.tabStatus,
-  });
+  const OrderDetailShippedPage({Key? key, required this.order})
+    : super(key: key);
 
   String formatCurrency(num amount) {
     final formatter = NumberFormat.currency(
@@ -20,6 +18,11 @@ class OrderDetailShippedPage extends StatelessWidget {
       decimalDigits: 0,
     );
     return formatter.format(amount);
+  }
+
+  double parseToDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString()) ?? 0.0;
   }
 
   String formatDateTime(String rawDateTime) {
@@ -31,44 +34,61 @@ class OrderDetailShippedPage extends StatelessWidget {
     }
   }
 
-  void _trackPackage(
-    BuildContext context,
-    String courier,
-    String trackingNumber,
-  ) async {
-    String url;
+  Future<void> _markAsReceived(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
 
-    if (courier == 'J&T') {
-      url = 'https://jet.co.id/track?awb=$trackingNumber';
-    } else if (courier == 'JNE') {
-      url = 'https://www.jne.co.id/id/tracking/trace?awb=$trackingNumber';
-    } else if (courier == 'SiCepat') {
-      url = 'https://www.sicepat.com/checkAwb?awb=$trackingNumber';
-    } else {
-      url = 'https://google.com';
+    if (token == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Autentikasi gagal')));
+      return;
     }
 
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final response = await http.patch(
+      Uri.parse(
+        'https://secondpeace.my.id/api/v1/pesanan/${order['id_pesanan']}/mark-received',
+      ),
+      headers: {'Authorization': 'Bearer $token', 'Accept': 'application/json'},
+    );
+
+    if (response.statusCode == 200) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pesanan ditandai sebagai selesai')),
+      );
+      Navigator.pop(context);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tidak dapat membuka halaman pelacakan.')),
+        const SnackBar(content: Text('Gagal memperbarui status pesanan')),
       );
+    }
+  }
+
+  String _getTrackingUrl(String ekspedisi, String resi) {
+    switch (ekspedisi.toLowerCase()) {
+      case 'jne':
+        return 'https://www.jne.co.id/id/tracking/trace/$resi';
+      case 'j&t':
+        return 'https://www.jet.co.id/track?awb=$resi';
+      case 'sicepat':
+        return 'https://www.sicepat.com/checkAwb?awb=$resi';
+      default:
+        return 'https://google.com/search?q=cek+resi+$resi';
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final List<Map<String, dynamic>> items = List<Map<String, dynamic>>.from(
-      order['detail_pesanan'] ?? [],
-    );
-    final String tanggalPesan = order['tanggal_pesan'] ?? '-';
-    final String ekspedisi = order['ekspedisi'] ?? '-';
-    final String resi = order['nomor_resi'] ?? '-';
-    final String estimasiTiba = order['estimasi_tiba'] ?? '-';
-    final double total =
-        (order['total_harga'] is num) ? order['total_harga'].toDouble() : 0.0;
+    final List<Map<String, dynamic>> items =
+        (order['detail_pesanan'] as List).map<Map<String, dynamic>>((e) {
+          return Map<String, dynamic>.from(e as Map);
+        }).toList();
+
+    final alamat = order['alamat'] is Map ? order['alamat'] : {};
+    final tanggalPesan = order['tanggal_pesan'] ?? '-';
+    final ekspedisi = order['ekspedisi'] ?? '-';
+    final resi = order['nomor_resi'] ?? '-';
+    final estimasiTiba = order['estimasi_tiba'] ?? '-';
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -80,6 +100,7 @@ class OrderDetailShippedPage extends StatelessWidget {
           "Pesanan #${order['id_pesanan'] ?? '-'}",
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
+
         centerTitle: true,
       ),
       body: Column(
@@ -89,25 +110,20 @@ class OrderDetailShippedPage extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               children: [
                 _buildShippedNotice(),
-                const SizedBox(height: 12),
+                const SizedBox(height: 20),
                 _buildSectionTitle("🧾 Daftar Produk"),
-                ...items.map((item) => _buildProductItem(item)).toList(),
+                ...items.map(_buildProductItem).toList(),
                 const SizedBox(height: 20),
                 _buildSectionTitle("📦 Informasi Pengiriman"),
                 _buildShippingInfo(
-                  penerima: order['penerima'] ?? '-',
-                  alamat: order['alamat'] ?? '-',
-                  whatsapp: order['no_whatsapp'] ?? '-',
+                  context,
+                  penerima: alamat['nama'] ?? '-',
+                  alamatLengkap: alamat['alamat'] ?? '-',
+                  whatsapp: alamat['no_whatsapp'] ?? '-',
                   tanggal: tanggalPesan,
                   ekspedisi: ekspedisi,
-                  resi: resi,
                   estimasiTiba: estimasiTiba,
-                ),
-                const SizedBox(height: 20),
-                _buildSectionTitle("💳 Informasi Pembayaran"),
-                _buildPaymentInfo(
-                  metode: order['metode_pembayaran'] ?? 'Transfer Bank',
-                  catatan: order['catatan'] ?? 'Tidak ada',
+                  resi: resi,
                 ),
               ],
             ),
@@ -120,7 +136,7 @@ class OrderDetailShippedPage extends StatelessWidget {
 
   Widget _buildShippedNotice() {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.purple[50],
         border: Border.all(color: Colors.purple),
@@ -132,7 +148,7 @@ class OrderDetailShippedPage extends StatelessWidget {
           SizedBox(width: 10),
           Expanded(
             child: Text(
-              "Pesanan sudah dikirim dan sedang dalam perjalanan. Anda dapat melacak status melalui nomor resi.",
+              'Pesanan sudah dikirim dan sedang dalam perjalanan. Tekan tombol di bawah jika pesanan sudah diterima.',
               style: TextStyle(color: Colors.purple, fontSize: 13),
             ),
           ),
@@ -149,11 +165,13 @@ class OrderDetailShippedPage extends StatelessWidget {
   }
 
   Widget _buildProductItem(Map<String, dynamic> item) {
-    final nama = item['nama_produk'] ?? '-';
+    final produk = item['produk'] ?? {};
+    final nama = produk['nama_produk'] ?? 'Produk tidak ditemukan';
     final jumlah = item['jumlah'] ?? 0;
-    final harga = item['harga'] ?? 0;
-    final ukuran = item['ukuran'] ?? '-';
-    final gambar = item['gambar'] ?? '';
+    final harga = parseToDouble(produk['harga']);
+    const baseUrl = 'https://secondpeace.my.id/uploads/';
+    final gambar = produk['gambar'] ?? '';
+    final fullImageUrl = gambar.isNotEmpty ? '$baseUrl$gambar' : '';
 
     return Card(
       elevation: 2,
@@ -162,30 +180,25 @@ class OrderDetailShippedPage extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child:
-                  gambar.isNotEmpty
+                  fullImageUrl.isNotEmpty
                       ? Image.network(
-                        gambar,
+                        fullImageUrl,
                         width: 70,
                         height: 70,
                         fit: BoxFit.cover,
                         errorBuilder:
-                            (context, error, stackTrace) => Container(
-                              width: 70,
-                              height: 70,
-                              color: Colors.grey[300],
-                              child: const Icon(Icons.broken_image),
-                            ),
+                            (_, __, ___) =>
+                                const Icon(Icons.broken_image, size: 70),
                       )
                       : Container(
                         width: 70,
                         height: 70,
                         color: Colors.grey[300],
-                        child: const Icon(Icons.image),
+                        child: const Icon(Icons.image_not_supported),
                       ),
             ),
             const SizedBox(width: 12),
@@ -196,13 +209,12 @@ class OrderDetailShippedPage extends StatelessWidget {
                   Text(
                     nama,
                     style: const TextStyle(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.bold,
                       fontSize: 15,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text("Jumlah: $jumlah"),
-                  Text("Ukuran: $ukuran"),
                   Text(
                     "Harga: ${formatCurrency(harga)}",
                     style: const TextStyle(
@@ -219,14 +231,15 @@ class OrderDetailShippedPage extends StatelessWidget {
     );
   }
 
-  Widget _buildShippingInfo({
+  Widget _buildShippingInfo(
+    BuildContext context, {
     required String penerima,
-    required String alamat,
+    required String alamatLengkap,
     required String whatsapp,
     required String tanggal,
     required String ekspedisi,
-    required String resi,
     required String estimasiTiba,
+    required String resi,
   }) {
     return Card(
       elevation: 2,
@@ -236,45 +249,72 @@ class OrderDetailShippedPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _infoRow(Icons.person_outline, "Penerima: $penerima"),
+            _infoRow(Icons.person, "Penerima: $penerima"),
             _infoRow(Icons.phone_android, "WhatsApp: $whatsapp"),
-            _infoRow(Icons.location_on_outlined, "Alamat: $alamat"),
+            _infoRow(Icons.location_on_outlined, "Alamat: $alamatLengkap"),
             _infoRow(Icons.access_time, "Tanggal Pesan: $tanggal"),
             _infoRow(Icons.local_shipping, "Ekspedisi: $ekspedisi"),
-            _infoRow(
-              Icons.calendar_month_outlined,
-              "Estimasi Tiba: $estimasiTiba",
-            ),
-            const SizedBox(height: 14),
-            Center(
-              child: Builder(
-                builder:
-                    (context) => GestureDetector(
-                      onTap: () {
-                        Clipboard.setData(ClipboardData(text: resi));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("Nomor resi disalin")),
-                        );
-                      },
-                      child: Column(
-                        children: [
-                          const Text(
-                            "Nomor Resi",
-                            style: TextStyle(fontSize: 13, color: Colors.black),
+            _infoRow(Icons.calendar_month, "Estimasi Tiba: $estimasiTiba"),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  const Icon(Icons.confirmation_number, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          "Resi: $resi",
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            resi,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: Color.fromARGB(221, 243, 0, 0),
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.copy, size: 18),
+                          onPressed: () {
+                            Clipboard.setData(ClipboardData(text: resi));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Nomor resi disalin!"),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
+                  ),
+                ],
               ),
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.travel_explore_outlined, size: 18),
+              style: ElevatedButton.styleFrom(
+                iconColor: Colors.white,
+                backgroundColor: Colors.black87,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                minimumSize: const Size(double.infinity, 40),
+              ),
+              label: const Text(
+                "Lacak Pengiriman",
+                style: TextStyle(fontSize: 14, color: Colors.white),
+              ),
+              onPressed: () async {
+                final trackingUrl = _getTrackingUrl(ekspedisi, resi);
+                if (await canLaunch(trackingUrl)) {
+                  await launch(trackingUrl);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Tidak dapat membuka halaman pelacakan"),
+                    ),
+                  );
+                }
+              },
             ),
           ],
         ),
@@ -295,29 +335,7 @@ class OrderDetailShippedPage extends StatelessWidget {
     );
   }
 
-  Widget _buildPaymentInfo({required String metode, required String catatan}) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _infoRow(Icons.payments_outlined, "Metode: $metode"),
-            _infoRow(Icons.edit_note, "Catatan: $catatan"),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildBottomBar(BuildContext context) {
-    final String ekspedisi = order['ekspedisi'] ?? '-';
-    final String resi = order['nomor_resi'] ?? '-';
-    final double total =
-        (order['total_harga'] is num) ? order['total_harga'].toDouble() : 0.0;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: const BoxDecoration(
@@ -325,39 +343,21 @@ class OrderDetailShippedPage extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 5)],
       ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Total Pembayaran',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              ),
-              Text(
-                formatCurrency(total),
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.red,
-                ),
-              ),
-            ],
+      child: ElevatedButton.icon(
+        icon: const Icon(Icons.check_circle_outline),
+        label: const Text(
+          "Pesanan Diterima",
+          style: TextStyle(fontSize: 16, color: Colors.white),
+        ),
+        style: ElevatedButton.styleFrom(
+          iconColor: Colors.white,
+          backgroundColor: Colors.black87,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
           ),
-          const SizedBox(height: 10),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.location_searching),
-            label: const Text("Lacak Paket"),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black87,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              minimumSize: const Size(double.infinity, 50),
-            ),
-            onPressed: () => _trackPackage(context, ekspedisi, resi),
-          ),
-        ],
+          minimumSize: const Size(double.infinity, 50),
+        ),
+        onPressed: () => _markAsReceived(context),
       ),
     );
   }

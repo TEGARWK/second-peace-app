@@ -6,7 +6,6 @@ import 'checkout_page.dart';
 import 'detail_page.dart';
 import '../models/product.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 
@@ -18,7 +17,6 @@ class CartPage extends StatefulWidget {
 }
 
 class _CartPageState extends State<CartPage> {
-  int? userId;
   bool _isLoading = true;
 
   @override
@@ -29,17 +27,7 @@ class _CartPageState extends State<CartPage> {
 
   Future<void> _loadCart() async {
     setState(() => _isLoading = true);
-
-    final prefs = await SharedPreferences.getInstance();
-    userId = prefs.getInt('userId');
-
-    if (userId != null) {
-      await Provider.of<CartProvider>(
-        context,
-        listen: false,
-      ).fetchCart(userId!);
-    }
-
+    await Provider.of<CartProvider>(context, listen: false).fetchCart();
     setState(() => _isLoading = false);
   }
 
@@ -92,13 +80,18 @@ class _CartPageState extends State<CartPage> {
                             itemBuilder: (context, index) {
                               final item = cartProvider.items[index];
                               final produk = item['produk'];
+                              if (produk == null)
+                                return const SizedBox.shrink();
+
                               final imageUrl =
                                   (produk['gambar'] != null &&
                                           produk['gambar']
                                               .toString()
                                               .startsWith('http'))
                                       ? produk['gambar']
-                                      : null;
+                                      : 'http://10.0.2.2:8000/uploads/${produk['gambar']}';
+
+                              final isSold = item['is_sold'] == true;
 
                               return FadeInUp(
                                 duration: const Duration(milliseconds: 300),
@@ -106,11 +99,8 @@ class _CartPageState extends State<CartPage> {
                                   key: Key(item['id_keranjang'].toString()),
                                   direction: DismissDirection.endToStart,
                                   onDismissed: (direction) async {
-                                    if (userId == null) return;
-
                                     await cartProvider.removeItem(
                                       item['id_keranjang'],
-                                      userId!,
                                     );
                                   },
                                   background: Container(
@@ -134,67 +124,65 @@ class _CartPageState extends State<CartPage> {
                                       borderRadius: BorderRadius.circular(15),
                                     ),
                                     child: ListTile(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder:
-                                                (_) => DetailPage(
-                                                  product: Product(
-                                                    id: produk['id_produk'],
-                                                    name: produk['nama_produk'],
-                                                    description:
-                                                        produk['deskripsi'],
-                                                    price:
-                                                        (produk['harga'] as num)
-                                                            .toDouble(),
-                                                    stock: produk['stok'],
-                                                    size: produk['size'],
-                                                    imageUrl: imageUrl,
+                                      onTap:
+                                          isSold
+                                              ? null
+                                              : () {
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder:
+                                                        (_) => DetailPage(
+                                                          product: Product(
+                                                            id:
+                                                                produk['id_produk'],
+                                                            name:
+                                                                produk['nama_produk'],
+                                                            description:
+                                                                produk['deskripsi'],
+                                                            price:
+                                                                (produk['harga']
+                                                                        as num)
+                                                                    .toDouble(),
+                                                            stock:
+                                                                produk['stok'],
+                                                            size:
+                                                                produk['size'],
+                                                            imageUrl: imageUrl,
+                                                          ),
+                                                          relatedProducts:
+                                                              const [],
+                                                        ),
                                                   ),
-                                                  relatedProducts: const [],
-                                                ),
-                                          ),
-                                        );
-                                      },
+                                                );
+                                              },
                                       leading: ClipRRect(
                                         borderRadius: BorderRadius.circular(10),
-                                        child:
-                                            imageUrl != null
-                                                ? CachedNetworkImage(
-                                                  imageUrl: imageUrl,
+                                        child: CachedNetworkImage(
+                                          imageUrl: imageUrl,
+                                          width: 60,
+                                          height: 60,
+                                          fit: BoxFit.cover,
+                                          placeholder:
+                                              (
+                                                context,
+                                                url,
+                                              ) => Shimmer.fromColors(
+                                                baseColor: Colors.grey.shade300,
+                                                highlightColor:
+                                                    Colors.grey.shade100,
+                                                child: Container(
                                                   width: 60,
                                                   height: 60,
-                                                  fit: BoxFit.cover,
-                                                  placeholder:
-                                                      (context, url) =>
-                                                          Shimmer.fromColors(
-                                                            baseColor:
-                                                                Colors
-                                                                    .grey
-                                                                    .shade300,
-                                                            highlightColor:
-                                                                Colors
-                                                                    .grey
-                                                                    .shade100,
-                                                            child: Container(
-                                                              width: 60,
-                                                              height: 60,
-                                                              color:
-                                                                  Colors
-                                                                      .grey
-                                                                      .shade300,
-                                                            ),
-                                                          ),
-                                                  errorWidget:
-                                                      (context, url, error) =>
-                                                          const Icon(
-                                                            Icons.broken_image,
-                                                          ),
-                                                )
-                                                : const Icon(
-                                                  Icons.broken_image,
+                                                  color: Colors.grey.shade300,
                                                 ),
+                                              ),
+                                          errorWidget:
+                                              (context, url, error) =>
+                                                  const Icon(
+                                                    Icons.broken_image,
+                                                  ),
+                                        ),
                                       ),
                                       title: Text(
                                         produk['nama_produk'] ?? 'Produk',
@@ -203,13 +191,43 @@ class _CartPageState extends State<CartPage> {
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                      subtitle: Text(
-                                        formatRupiah(produk['harga'] ?? 0),
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.red,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                      subtitle: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            formatRupiah(produk['harga'] ?? 0),
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.red,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          if (isSold)
+                                            Container(
+                                              margin: const EdgeInsets.only(
+                                                top: 4,
+                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.orange.shade100,
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                              child: const Text(
+                                                'Stok habis • Produk sudah terjual habis',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.deepOrange,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
                                       ),
                                       trailing: Transform.scale(
                                         scale: 1.2,
@@ -221,9 +239,14 @@ class _CartPageState extends State<CartPage> {
                                           ),
                                           value: item['selected'] ?? false,
                                           activeColor: Colors.green,
-                                          onChanged: (value) {
-                                            cartProvider.toggleSelect(index);
-                                          },
+                                          onChanged:
+                                              isSold
+                                                  ? null
+                                                  : (value) {
+                                                    cartProvider.toggleSelect(
+                                                      index,
+                                                    );
+                                                  },
                                         ),
                                       ),
                                     ),
@@ -263,6 +286,7 @@ class _CartPageState extends State<CartPage> {
                       ),
                       value: cartProvider.isAllChecked,
                       activeColor: Colors.green,
+                      checkColor: Colors.white,
                       onChanged: (value) {
                         cartProvider.toggleSelectAll(value ?? false);
                       },
@@ -301,11 +325,14 @@ class _CartPageState extends State<CartPage> {
             onPressed: () {
               final selectedItems =
                   cartProvider.items
-                      .where((item) => item['selected'] ?? false)
+                      .where(
+                        (item) =>
+                            (item['selected'] ?? false) &&
+                            item['is_sold'] != true,
+                      )
                       .map(
                         (item) => {
-                          'id_produk':
-                              item['produk']['id_produk'], // ⬅️ ini yang penting
+                          'id_produk': item['produk']['id_produk'],
                           'name': item['produk']['nama_produk'] ?? 'Produk',
                           'price': item['produk']['harga'] ?? 0,
                           'quantity': item['jumlah'] ?? 1,
@@ -315,7 +342,7 @@ class _CartPageState extends State<CartPage> {
                                 return (gambar != null &&
                                         gambar.toString().startsWith('http'))
                                     ? gambar
-                                    : 'https://secondpeace.my.id/uploads/$gambar';
+                                    : 'http://10.0.2.2:8000/uploads/$gambar';
                               })(),
                         },
                       )
