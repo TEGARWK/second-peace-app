@@ -90,6 +90,8 @@ class OrderDetailUnpaidPage extends StatelessWidget {
     final String tanggalPesan = order['tanggal'] ?? '-';
     final String expiredAt = order['expired_at'] ?? '';
     final double total = parseToDouble(order['grand_total']);
+    final double ongkir = parseToDouble(order['ongkir']);
+    final double subtotalProduk = total - ongkir;
 
     final alamatData = order['alamat'] ?? {};
     final String alamatLengkap = alamatData['alamat'] ?? '-';
@@ -103,9 +105,10 @@ class OrderDetailUnpaidPage extends StatelessWidget {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         title: Text(
-          "Pesanan #\${order['id_pesanan'] ?? '-'}",
+          "Pesanan #${order['id_pesanan'] ?? '-'}",
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
+
         centerTitle: true,
       ),
       body: Column(
@@ -125,6 +128,12 @@ class OrderDetailUnpaidPage extends StatelessWidget {
                   alamat: alamatLengkap,
                   whatsapp: whatsapp,
                   tanggal: tanggalPesan,
+                ),
+                const SizedBox(height: 20),
+                _buildRingkasanPembayaran(
+                  subtotal: subtotalProduk,
+                  ongkir: ongkir,
+                  total: total,
                 ),
                 const SizedBox(height: 20),
                 _buildSectionTitle("💳 Informasi Pembayaran"),
@@ -210,6 +219,14 @@ class OrderDetailUnpaidPage extends StatelessWidget {
                         width: 70,
                         height: 70,
                         fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: 70,
+                            height: 70,
+                            color: Colors.grey[300],
+                            child: const Icon(Icons.image_not_supported),
+                          );
+                        },
                       )
                       : Container(
                         width: 70,
@@ -297,6 +314,55 @@ class OrderDetailUnpaidPage extends StatelessWidget {
       ),
     ),
   );
+
+  Widget _buildRingkasanPembayaran({
+    required double subtotal,
+    required double ongkir,
+    required double total,
+  }) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "🧮 Ringkasan Pembayaran",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Subtotal Produk"),
+                Text(formatCurrency(subtotal)),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [const Text("Ongkir"), Text(formatCurrency(ongkir))],
+            ),
+            const Divider(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Total"),
+                Text(
+                  formatCurrency(total),
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildPaymentInfo({required String metode}) => Card(
     elevation: 2,

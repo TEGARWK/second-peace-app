@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
-  final String baseUrl = 'https://secondpeace.my.id/api/v1';
+  final String baseUrl = 'http://10.0.2.2:8000/api/v1';
 
   Future<void> _saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
@@ -21,7 +21,6 @@ class AuthService {
     await prefs.remove('token');
   }
 
-  // ✅ REGISTER
   Future<Map<String, dynamic>> registerUser({
     required String nama,
     required String username,
@@ -59,7 +58,6 @@ class AuthService {
     }
   }
 
-  // ✅ LOGIN
   Future<Map<String, dynamic>> loginUser({
     required String email,
     required String password,
@@ -86,7 +84,6 @@ class AuthService {
     }
   }
 
-  // ✅ UPDATE PROFIL
   Future<Map<String, dynamic>> updateProfile({
     required String nama,
     required String email,
@@ -118,7 +115,6 @@ class AuthService {
     }
   }
 
-  // ✅ GET ALAMAT
   Future<List<Map<String, dynamic>>> getAddresses() async {
     try {
       final token = await _getToken();
@@ -141,7 +137,6 @@ class AuthService {
     }
   }
 
-  // ✅ TAMBAH / UPDATE / HAPUS / SET UTAMA ALAMAT
   Future<Map<String, dynamic>> _alamatRequest({
     required String method,
     int? id,
@@ -208,6 +203,10 @@ class AuthService {
     required String kota,
     required String kodePos,
     required bool utama,
+    required int kotaId,
+    required int provinsiId,
+    required String kotaNama, // ✅ Tambah ini
+    required String provinsiNama, // ✅ Tambah ini
   }) {
     return _alamatRequest(
       method: 'POST',
@@ -216,6 +215,10 @@ class AuthService {
         'no_whatsapp': telepon,
         'alamat': alamat,
         'utama': utama,
+        'kota_id': kotaId,
+        'provinsi_id': provinsiId,
+        'kota_nama': kotaNama, // ✅ Tambah ini
+        'provinsi_nama': provinsiNama, // ✅ Tambah ini
       },
     );
   }
@@ -228,6 +231,10 @@ class AuthService {
     required String kota,
     required String kodePos,
     required bool utama,
+    required int kotaId,
+    required int provinsiId,
+    required String kotaNama, // ✅ Tambah ini
+    required String provinsiNama, // ✅ Tambah ini
   }) {
     return _alamatRequest(
       method: 'PUT',
@@ -237,6 +244,10 @@ class AuthService {
         'no_whatsapp': telepon,
         'alamat': alamat,
         'utama': utama,
+        'kota_id': kotaId,
+        'provinsi_id': provinsiId,
+        'kota_nama': kotaNama, // ✅ Tambah ini
+        'provinsi_nama': provinsiNama, // ✅ Tambah ini
       },
     );
   }
@@ -249,10 +260,11 @@ class AuthService {
     return _alamatRequest(method: 'PATCH', id: id, body: {}, setPrimary: true);
   }
 
-  // ✅ CHECKOUT
   Future<Map<String, dynamic>> checkout(
     List<Map<String, dynamic>> produkList, {
     required String ekspedisi,
+    required int ongkir,
+    required String estimasi,
   }) async {
     try {
       final token = await _getToken();
@@ -263,11 +275,16 @@ class AuthService {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: jsonEncode({'produk': produkList, 'ekspedisi': ekspedisi}),
+        body: jsonEncode({
+          'produk': produkList,
+          'ekspedisi': ekspedisi,
+          'ongkir': ongkir,
+          'estimasi': estimasi,
+        }),
       );
 
       print('[CHECKOUT] status: ${response.statusCode}');
-      print('[CHECKOUT] response: ${response.body}'); // 🔥 Tambahkan ini
+      print('[CHECKOUT] response: ${response.body}');
 
       final data = jsonDecode(response.body);
 
@@ -291,7 +308,6 @@ class AuthService {
     }
   }
 
-  // (Opsional) GET user profile
   Future<Map<String, dynamic>> getUserProfile() async {
     try {
       final token = await _getToken();

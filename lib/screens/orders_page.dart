@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-
+import 'package:secondpeacem/services/order_service.dart';
 import 'order_detail_unpaid_page.dart';
 import 'order_detail_processing_page.dart';
 import 'order_detail_shipped_page.dart' as pageShipped;
@@ -28,6 +25,8 @@ class _OrdersPageState extends State<OrdersPage>
   List<Map<String, dynamic>> received = [];
   List<Map<String, dynamic>> cancelled = [];
 
+  final _orderService = OrderService();
+
   final currencyFormatter = NumberFormat.currency(
     locale: 'id_ID',
     symbol: 'Rp ',
@@ -38,7 +37,7 @@ class _OrdersPageState extends State<OrdersPage>
   void initState() {
     super.initState();
     _loadUserOrders();
-    _pollForUpdatedOrders(); // Mulai polling setelah inisialisasi
+    _pollForUpdatedOrders();
   }
 
   @override
@@ -55,11 +54,17 @@ class _OrdersPageState extends State<OrdersPage>
 
   @override
   void didPopNext() {
-    _loadUserOrders(); // Reload setelah kembali ke halaman
+    setState(() {
+      unpaid.clear();
+      processing.clear();
+      shipped.clear();
+      received.clear();
+      cancelled.clear();
+    });
+    _loadUserOrders();
   }
 
   String mapStatusToTab(String backendStatus) {
-    print('🔥 status dari backend: $backendStatus');
     switch (backendStatus) {
       case 'Menunggu Pembayaran':
         return 'Belum Bayar';
@@ -78,40 +83,16 @@ class _OrdersPageState extends State<OrdersPage>
   }
 
   Future<void> _loadUserOrders() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
-
-    print('🔑 TOKEN SAAT REQUEST: $token');
-
-    if (token == null) return;
-
     try {
-      final response = await http.get(
-        Uri.parse('https://secondpeace.my.id/api/v1/pesanan'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final List orders = data['pesanan'];
-
-        print('📦 total pesanan diterima: ${orders.length}');
-
-        // Periksa jika widget masih terpasang sebelum melakukan update state
-        if (mounted) {
-          setState(() {
-            unpaid = _filterOrders(orders, 'Belum Bayar');
-            processing = _filterOrders(orders, 'Diproses');
-            shipped = _filterOrders(orders, 'Dikirim');
-            received = _filterOrders(orders, 'Selesai');
-            cancelled = _filterOrders(orders, 'Dibatalkan');
-          });
-        }
-      } else {
-        print('Gagal memuat pesanan: ${response.body}');
+      final orders = await _orderService.fetchUserOrders();
+      if (mounted) {
+        setState(() {
+          unpaid = _filterOrders(orders, 'Belum Bayar');
+          processing = _filterOrders(orders, 'Diproses');
+          shipped = _filterOrders(orders, 'Dikirim');
+          received = _filterOrders(orders, 'Selesai');
+          cancelled = _filterOrders(orders, 'Dibatalkan');
+        });
       }
     } catch (e) {
       print('❌ Error memuat pesanan: $e');
@@ -120,23 +101,15 @@ class _OrdersPageState extends State<OrdersPage>
 
   List<Map<String, dynamic>> _filterOrders(List orders, String statusTab) {
     return orders
-        .where((o) {
-          final mapped = mapStatusToTab(o['status_pesanan']);
-          print('📍 status_pesanan: ${o['status_pesanan']} ➜ tab: $mapped');
-          return mapped == statusTab;
-        })
+        .where((o) => mapStatusToTab(o['status_pesanan']) == statusTab)
         .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
         .toList();
   }
 
-  // Polling untuk memeriksa status pesanan secara periodik
   Future<void> _pollForUpdatedOrders() async {
-    while (true) {
-      // Pastikan widget masih terpasang sebelum memanggil _loadUserOrders
-      if (!mounted) return;
-
+    while (mounted) {
       await _loadUserOrders();
-      await Future.delayed(Duration(seconds: 10)); // Polling setiap 10 detik
+      await Future.delayed(const Duration(seconds: 10));
     }
   }
 
@@ -145,32 +118,15 @@ class _OrdersPageState extends State<OrdersPage>
     String newStatus,
     String resi,
   ) async {
-    final response = await http.put(
-      Uri.parse('https://secondpeace.my.id/api/v1/pesanan/$orderId'),
-      headers: {
-        'Authorization': 'Bearer YOUR_TOKEN_HERE',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({'status': newStatus, 'resi': resi}),
-    );
-
-    if (response.statusCode == 200) {
-      // Update status di local list setelah status diperbarui
-      if (mounted) {
-        setState(() {
-          // Ganti 'processing' dengan daftar yang sesuai (misalnya 'unpaid', 'shipped', etc.)
-          final updatedOrder = processing.firstWhere(
-            (order) => order['id_pesanan'] == orderId,
-          );
-          updatedOrder['status_pesanan'] = newStatus;
-          updatedOrder['nomor_resi'] = resi;
-        });
-      }
-
-      // Refresh data setelah perubahan
-      _loadUserOrders();
-    } else {
-      throw Exception('Failed to update order status');
+    try {
+      await _orderService.updateOrderStatus(
+        orderId: orderId,
+        status: newStatus,
+        resi: resi,
+      );
+      await _loadUserOrders();
+    } catch (e) {
+      print('❌ Gagal update status: $e');
     }
   }
 
@@ -258,10 +214,7 @@ class _OrdersPageState extends State<OrdersPage>
           );
           final firstItem = items.isNotEmpty ? items[0] : null;
           final produk = firstItem?['produk'];
-          final namaProduk =
-              produk != null
-                  ? produk['nama_produk'] ?? 'Produk tidak ditemukan'
-                  : 'Produk tidak ditemukan';
+          final namaProduk = produk?['nama_produk'] ?? 'Produk tidak ditemukan';
 
           final additionalCount = (items.length - 1).clamp(0, items.length);
           final totalItems = items.fold<int>(0, (sum, item) {
@@ -269,7 +222,8 @@ class _OrdersPageState extends State<OrdersPage>
             return sum + (qty is int ? qty : int.tryParse(qty.toString()) ?? 0);
           });
 
-          final totalHarga = order['grand_total'] ?? 0;
+          final grandTotal = order['total_harga'] ?? 0;
+
           final formattedDate = order['tanggal'] ?? '-';
 
           return GestureDetector(
@@ -321,10 +275,7 @@ class _OrdersPageState extends State<OrdersPage>
                     if ((order['nomor_resi'] ?? '').toString().isNotEmpty)
                       Text(
                         "🔢 Resi: ${order['nomor_resi']}",
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.black87,
-                        ),
+                        style: const TextStyle(fontSize: 13),
                       ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -337,7 +288,7 @@ class _OrdersPageState extends State<OrdersPage>
                           ),
                         ),
                         Text(
-                          "💸 ${currencyFormatter.format(totalHarga)}",
+                          "💸 ${currencyFormatter.format(grandTotal)}",
                           style: const TextStyle(
                             fontSize: 15,
                             color: Colors.red,
@@ -366,7 +317,10 @@ class _OrdersPageState extends State<OrdersPage>
         detailPage = OrderDetailProcessingPage(order: order, tabStatus: status);
         break;
       case 'Dikirim':
-        detailPage = pageShipped.OrderDetailShippedPage(order: order);
+        detailPage = pageShipped.OrderDetailShippedPage(
+          idPesanan: order['id_pesanan'],
+        );
+
         break;
       case 'Selesai':
         detailPage = pageReceived.OrderDetailReceivedPage(order: order);

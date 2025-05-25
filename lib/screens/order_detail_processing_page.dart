@@ -37,14 +37,21 @@ class OrderDetailProcessingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final List<Map<String, dynamic>> items =
+    final List<Map<String, dynamic>> items = [];
+
+    if (order['detail_pesanan'] is List) {
+      items.addAll(
         (order['detail_pesanan'] as List).map<Map<String, dynamic>>((e) {
           return Map<String, dynamic>.from(e as Map);
-        }).toList();
+        }),
+      );
+    }
 
     final String ekspedisi = order['ekspedisi'] ?? '-';
     final String estimasiTiba = formatDateTime(order['estimasi_tiba'] ?? '');
     final double total = parseToDouble(order['grand_total']);
+    final double ongkir = parseToDouble(order['ongkir']);
+    final double subtotal = total - ongkir;
 
     final String tanggalPesan = formatDateTime(order['tanggal_pesan'] ?? '');
 
@@ -85,6 +92,11 @@ class OrderDetailProcessingPage extends StatelessWidget {
                   ekspedisi: ekspedisi,
                   estimasiTiba: estimasiTiba,
                 ),
+                _buildRingkasanPembayaran(
+                  subtotal: subtotal,
+                  ongkir: ongkir,
+                  total: total,
+                ),
 
                 const SizedBox(height: 20),
                 _buildSectionTitle("💳 Informasi Pembayaran"),
@@ -110,7 +122,7 @@ class OrderDetailProcessingPage extends StatelessWidget {
       ),
       child: Row(
         children: const [
-          Icon(Icons.local_shipping_outlined, color: Colors.blue),
+          Icon(Icons.inventory_2_outlined, color: Colors.blue),
           SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -269,6 +281,55 @@ class OrderDetailProcessingPage extends StatelessWidget {
                 const Icon(Icons.calendar_month_outlined),
                 const SizedBox(width: 8),
                 Text("Estimasi Tiba: $estimasiTiba"),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRingkasanPembayaran({
+    required double subtotal,
+    required double ongkir,
+    required double total,
+  }) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "🧮 Ringkasan Pembayaran",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Subtotal Produk"),
+                Text(formatCurrency(subtotal)),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [const Text("Ongkir"), Text(formatCurrency(ongkir))],
+            ),
+            const Divider(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Total"),
+                Text(
+                  formatCurrency(total),
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
           ],

@@ -14,6 +14,12 @@ import 'package:secondpeacem/screens/snap_webview_page.dart';
 import 'package:secondpeacem/screens/product_wrapper.dart';
 import 'package:secondpeacem/screens/register_page.dart';
 import 'package:secondpeacem/screens/login_page.dart';
+import 'package:secondpeacem/providers/notification_provider.dart';
+import 'package:secondpeacem/screens/order_detail_processing_page.dart';
+import 'package:secondpeacem/screens/order_detail_shipped_page.dart';
+import 'package:secondpeacem/screens/order_detail_received_page.dart';
+import 'package:secondpeacem/screens/order_detail_cancelled_page.dart';
+import 'package:secondpeacem/screens/order_detail_unpaid_page.dart';
 
 // ✅ Tambahkan RouteObserver global
 final RouteObserver<ModalRoute<void>> routeObserver =
@@ -44,7 +50,8 @@ class MyApp extends StatelessWidget {
         final isLoggedIn = token.isNotEmpty;
 
         final cartService = CartService(
-          baseUrl: 'https://secondpeace.my.id/api/v1',
+          //baseUrl: 'https://secondpeace.my.id/api/v1',
+          baseUrl: 'http://10.0.2.2:8000/api/v1',
           token: token,
         );
 
@@ -52,6 +59,9 @@ class MyApp extends StatelessWidget {
           providers: [
             ChangeNotifierProvider(
               create: (_) => CartProvider(cartService: cartService),
+            ),
+            ChangeNotifierProvider(
+              create: (_) => NotificationProvider()..fetchUnreadCount(),
             ),
           ],
           child: SecondPeaceApp(isLoggedIn: isLoggedIn),
@@ -100,6 +110,33 @@ class SecondPeaceApp extends StatelessWidget {
           );
         },
         '/success': (context) => const PembayaranSuksesPage(),
+        '/order-detail': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+
+          if (args is Map<dynamic, dynamic>) {
+            final order = Map<String, dynamic>.from(args);
+            final status = order['status'] ?? order['status_pesanan'] ?? '';
+
+            if (status == 'Pesanan Dikirim') {
+              return OrderDetailShippedPage(idPesanan: order['id_pesanan']);
+            } else if (status == 'Pesanan Diterima') {
+              return OrderDetailReceivedPage(order: order);
+            } else if (status == 'Pesanan Dibatalkan') {
+              return OrderDetailCancelledPage(order: order); // kalau ada
+            } else if (status == 'Menunggu Pembayaran') {
+              return OrderDetailUnpaidPage(
+                order: order,
+                tabStatus: status, // ✅ tambahkan ini
+              );
+            } else {
+              return OrderDetailProcessingPage(order: order, tabStatus: status);
+            }
+          }
+
+          return const Scaffold(
+            body: Center(child: Text("Data notifikasi tidak valid")),
+          );
+        },
       },
     );
   }

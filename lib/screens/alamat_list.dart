@@ -40,7 +40,7 @@ class _DaftarAlamatPageState extends State<DaftarAlamatPage> {
         final updatedAddresses = await AuthService().getAddresses();
         final newPrimary = updatedAddresses.firstWhere((a) => a['utama'] == 1);
 
-        Navigator.pop(context, newPrimary); // Kirim alamat baru langsung
+        Navigator.pop(context, newPrimary);
       }
     } catch (e) {
       print("Gagal set utama: $e");
@@ -69,7 +69,7 @@ class _DaftarAlamatPageState extends State<DaftarAlamatPage> {
       ),
     );
     if (result == true) {
-      _loadAlamatUser(); // <- ini yang akan memuat ulang
+      _loadAlamatUser();
     }
   }
 
@@ -105,7 +105,6 @@ class _DaftarAlamatPageState extends State<DaftarAlamatPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Nama dan label "Utama"
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -154,6 +153,22 @@ class _DaftarAlamatPageState extends State<DaftarAlamatPage> {
                           ),
                           const SizedBox(height: 8),
                           Text(alamat['alamat'] ?? ''),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Kota: ${alamat['kota_nama'] ?? '-'}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          Text(
+                            'Provinsi: ${alamat['provinsi_nama'] ?? '-'}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey,
+                            ),
+                          ),
+
                           const Divider(height: 20),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -36,10 +36,12 @@ class OrderDetailReceivedPage extends StatelessWidget {
       order['detail_pesanan'] ?? [],
     );
     final alamat = order['alamat'] ?? {};
-    final totalHarga = order['grand_total'];
     final tanggalDiterima = order['tanggal_diterima'];
     final ekspedisi = order['ekspedisi'] ?? '-';
     final resi = order['nomor_resi'] ?? '-';
+    final double totalHarga = parseToDouble(order['grand_total']);
+    final double ongkir = parseToDouble(order['ongkir']);
+    final double subtotal = totalHarga - ongkir;
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -73,6 +75,12 @@ class OrderDetailReceivedPage extends StatelessWidget {
                   ekspedisi: ekspedisi,
                   resi: resi,
                   tanggalDiterima: formatDateTime(tanggalDiterima),
+                ),
+                const SizedBox(height: 20),
+                _buildRingkasanPembayaran(
+                  subtotal: subtotal,
+                  ongkir: ongkir,
+                  total: totalHarga,
                 ),
               ],
             ),
@@ -221,6 +229,55 @@ class OrderDetailReceivedPage extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(child: Text(text)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRingkasanPembayaran({
+    required double subtotal,
+    required double ongkir,
+    required double total,
+  }) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "🧮 Ringkasan Pembayaran",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Subtotal Produk"),
+                Text(formatCurrency(subtotal)),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [const Text("Ongkir"), Text(formatCurrency(ongkir))],
+            ),
+            const Divider(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Total"),
+                Text(
+                  formatCurrency(total),
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

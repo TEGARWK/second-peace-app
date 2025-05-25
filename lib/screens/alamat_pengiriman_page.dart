@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../services/shipping_service.dart';
 
 class AlamatPengirimanPage extends StatefulWidget {
   final Map<String, dynamic>? existingData;
@@ -16,6 +17,12 @@ class _AlamatPengirimanPageState extends State<AlamatPengirimanPage> {
   late TextEditingController _namaController;
   late TextEditingController _noHpController;
   late TextEditingController _alamatLengkapController;
+
+  List<Map<String, dynamic>> provinces = [];
+  List<Map<String, dynamic>> cities = [];
+
+  Map<String, dynamic>? selectedProvince;
+  Map<String, dynamic>? selectedCity;
 
   bool isUtama = false;
   bool isLoading = false;
@@ -35,6 +42,38 @@ class _AlamatPengirimanPageState extends State<AlamatPengirimanPage> {
     isUtama =
         widget.existingData?['utama'] == 1 ||
         widget.existingData?['utama'] == true;
+
+    () async {
+      await _loadProvinces();
+      if (widget.existingData != null) {
+        selectedProvince = {
+          'id': widget.existingData!['provinsi_id'].toString(),
+          'name': widget.existingData!['provinsi_nama'],
+        };
+
+        selectedCity = {
+          'id': widget.existingData!['kota_id'].toString(),
+          'name': widget.existingData!['kota_nama'],
+        };
+
+        await _loadCities(widget.existingData!['provinsi_id'].toString());
+      }
+    }();
+
+    if (widget.existingData != null) {
+      selectedProvince = {
+        'id': widget.existingData!['provinsi_id'].toString(),
+        'name': widget.existingData!['provinsi_nama'],
+      };
+
+      selectedCity = {
+        'id': widget.existingData!['kota_id'].toString(),
+        'name': widget.existingData!['kota_nama'],
+      };
+
+      _loadCities(widget.existingData!['provinsi_id'].toString());
+      print(cities);
+    }
   }
 
   @override
@@ -45,8 +84,31 @@ class _AlamatPengirimanPageState extends State<AlamatPengirimanPage> {
     super.dispose();
   }
 
+  Future<void> _loadProvinces() async {
+    try {
+      provinces = await ShippingService().getProvinces();
+      setState(() {});
+    } catch (e) {
+      print('Gagal memuat provinsi: $e');
+    }
+  }
+
+  Future<void> _loadCities(String provinceId) async {
+    try {
+      cities = await ShippingService().getCities(provinceId);
+      setState(() {});
+    } catch (e) {
+      print('Gagal memuat kota: $e');
+    }
+  }
+
   Future<void> _simpanAlamat() async {
     if (_formKey.currentState!.validate()) {
+      if (selectedProvince == null || selectedCity == null) {
+        _showError('Provinsi dan kota wajib dipilih.');
+        return;
+      }
+
       setState(() => isLoading = true);
 
       try {
@@ -56,8 +118,12 @@ class _AlamatPengirimanPageState extends State<AlamatPengirimanPage> {
                   nama: _namaController.text.trim(),
                   telepon: _noHpController.text.trim(),
                   alamat: _alamatLengkapController.text.trim(),
-                  kota: "-", // tidak digunakan
-                  kodePos: "-", // tidak digunakan
+                  kodePos: '-',
+                  kota: selectedCity!['name'],
+                  kotaId: double.parse(selectedCity!['id']).toInt(),
+                  kotaNama: selectedCity!['name'], // ✅ TAMBAH INI
+                  provinsiId: double.parse(selectedProvince!['id']).toInt(),
+                  provinsiNama: selectedProvince!['name'], // ✅ TAMBAH INI
                   utama: isUtama,
                 )
                 : await AuthService().updateAddress(
@@ -65,18 +131,25 @@ class _AlamatPengirimanPageState extends State<AlamatPengirimanPage> {
                   nama: _namaController.text.trim(),
                   telepon: _noHpController.text.trim(),
                   alamat: _alamatLengkapController.text.trim(),
-                  kota: "-",
-                  kodePos: "-",
+                  kodePos: '-',
+                  kota: selectedCity!['name'],
+                  kotaId: double.parse(selectedCity!['id']).toInt(),
+                  kotaNama: selectedCity!['name'],
+                  provinsiId: double.parse(selectedProvince!['id']).toInt(),
+                  provinsiNama: selectedProvince!['name'],
                   utama: isUtama,
                 );
 
         if (result['success'] == true) {
+          print('RESPON API: $result');
+
           Navigator.pop(context, true);
         } else {
           _showError(result['message'] ?? 'Gagal menyimpan alamat.');
         }
       } catch (e) {
-        _showError('Terjadi kesalahan saat menyimpan alamat.');
+        print('ERROR: $e');
+        _showError(e.toString());
       } finally {
         setState(() => isLoading = false);
       }
@@ -105,26 +178,85 @@ class _AlamatPengirimanPageState extends State<AlamatPengirimanPage> {
         child: Form(
           key: _formKey,
           child: Card(
-            elevation: 5,
+            elevation: 6,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
             ),
+            color: Colors.grey[50],
             child: Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     "Form Alamat Pengiriman",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   _buildTextField("Nama Penerima", _namaController),
                   _buildTextField(
                     "Nomor WhatsApp",
                     _noHpController,
                     keyboardType: TextInputType.phone,
                   ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<Map<String, dynamic>>(
+                    decoration: const InputDecoration(
+                      labelText: 'Pilih Provinsi',
+                    ),
+                    value:
+                        selectedProvince != null &&
+                                provinces.any(
+                                  (p) => p['id'] == selectedProvince!['id'],
+                                )
+                            ? provinces.firstWhere(
+                              (p) => p['id'] == selectedProvince!['id'],
+                            )
+                            : null,
+                    items:
+                        provinces.map((prov) {
+                          return DropdownMenuItem(
+                            value: prov,
+                            child: Text(prov['name'] ?? 'Tanpa Nama'),
+                          );
+                        }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedProvince = value;
+                        selectedCity = null;
+                        cities = [];
+                      });
+                      if (value != null) {
+                        _loadCities(value['id'].toString());
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<Map<String, dynamic>>(
+                    decoration: const InputDecoration(labelText: 'Pilih Kota'),
+                    value:
+                        selectedCity != null &&
+                                cities.any(
+                                  (c) => c['id'] == selectedCity!['id'],
+                                )
+                            ? cities.firstWhere(
+                              (c) => c['id'] == selectedCity!['id'],
+                            )
+                            : null,
+                    items:
+                        cities.map((city) {
+                          return DropdownMenuItem(
+                            value: city,
+                            child: Text(city['name'] ?? 'Tanpa Nama'),
+                          );
+                        }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedCity = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
                   _buildTextField(
                     "Alamat Lengkap",
                     _alamatLengkapController,
@@ -136,9 +268,7 @@ class _AlamatPengirimanPageState extends State<AlamatPengirimanPage> {
                       Switch(
                         value: isUtama,
                         activeColor: Colors.green,
-                        onChanged: (value) {
-                          setState(() => isUtama = value);
-                        },
+                        onChanged: (value) => setState(() => isUtama = value),
                       ),
                       const SizedBox(width: 8),
                       const Expanded(
@@ -157,9 +287,9 @@ class _AlamatPengirimanPageState extends State<AlamatPengirimanPage> {
                       onPressed: isLoading ? null : _simpanAlamat,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                       label: Text(

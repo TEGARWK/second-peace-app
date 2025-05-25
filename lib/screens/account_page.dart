@@ -62,7 +62,7 @@ class _AccountPageState extends State<AccountPage> {
 
   Future<void> _fetchOrderCounts(String email) async {
     try {
-      final counts = await OrderService.getOrderCounts(email);
+      final counts = await OrderService().getOrderCountsByStatus();
 
       if (!mounted) return; // ✅ Tambahkan ini juga
 

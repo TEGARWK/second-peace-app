@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../widgets/custom_navbar.dart';
 import '../services/auth_service.dart';
+import '../services/shipping_service.dart';
 import 'alamat_list.dart';
 
 class CheckoutPage extends StatefulWidget {
@@ -14,17 +15,18 @@ class CheckoutPage extends StatefulWidget {
 }
 
 class _CheckoutPageState extends State<CheckoutPage> {
-  String? selectedCourier;
   Map<String, dynamic>? selectedAddress;
   bool isProcessing = false;
-
+  bool isLoadingCourier = false;
   final formatCurrency = NumberFormat.currency(
     locale: 'id_ID',
     symbol: 'Rp ',
     decimalDigits: 0,
   );
 
-  final Map<String, int> courierEstimates = {'J&T': 2, 'JNE': 3, 'SiCepat': 1};
+  List<Map<String, dynamic>> courierOptions = [];
+  Map<String, dynamic>? selectedCourierOption;
+  String? selectedCourierCode;
 
   @override
   void initState() {
@@ -36,7 +38,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
     if (override != null) {
       setState(() {
         selectedAddress = override;
+        selectedCourierOption = null;
+        courierOptions = [];
       });
+      _loadCourierOptions();
       return;
     }
 
@@ -50,41 +55,75 @@ class _CheckoutPageState extends State<CheckoutPage> {
         setState(() {
           selectedAddress = primary;
         });
+        _loadCourierOptions();
       }
     } catch (e) {
       print('❌ Gagal memuat alamat utama: $e');
     }
   }
 
-  Future<void> _bayarSekarang(double totalHarga) async {
-    if (selectedCourier == null) {
+  Future<void> _loadCourierOptions() async {
+    if (selectedAddress == null) return;
+
+    if (selectedCourierCode == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Pilih kurir terlebih dahulu")),
+        const SnackBar(content: Text("Silakan pilih kurir terlebih dahulu")),
       );
       return;
     }
 
-    if (widget.selectedItems.isEmpty) {
+    // ✅ Hitung berat otomatis
+    int totalWeight = widget.selectedItems.fold<int>(0, (sum, item) {
+      final qty = int.tryParse(item['quantity'].toString()) ?? 1;
+      return sum + (qty * 300);
+    });
+
+    setState(() => isLoadingCourier = true);
+    try {
+      final costResults = await ShippingService().getCosts(
+        originCityId: "501", // Kab. Indramayu
+        destinationCityId: selectedAddress!['kota_id'].toString(),
+        weight: totalWeight,
+        courier: selectedCourierCode!,
+      );
+
+      setState(() {
+        courierOptions = costResults;
+        selectedCourierOption = null;
+      });
+    } catch (e) {
+      print("❌ Gagal memuat ongkir: $e");
+    } finally {
+      setState(() => isLoadingCourier = false);
+    }
+  }
+
+  Future<void> _bayarSekarang(double totalHarga) async {
+    if (selectedCourierOption == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Tidak ada produk yang dipilih")),
+        const SnackBar(
+          content: Text("Pilih layanan pengiriman terlebih dahulu"),
+        ),
       );
       return;
     }
 
     try {
-      final authService = AuthService();
+      final produkList =
+          widget.selectedItems
+              .map(
+                (item) => {
+                  'id_produk': item['id_produk'],
+                  'jumlah': item['quantity'] ?? 1,
+                },
+              )
+              .toList();
 
-      final List<Map<String, dynamic>> produkList =
-          widget.selectedItems.map((item) {
-            return {
-              'id_produk': item['id_produk'],
-              'jumlah': item['quantity'] ?? 1,
-            };
-          }).toList();
-
-      final response = await authService.checkout(
+      final response = await AuthService().checkout(
         produkList,
-        ekspedisi: selectedCourier!,
+        ekspedisi: selectedCourierOption!['service'],
+        ongkir: selectedCourierOption!['cost'],
+        estimasi: selectedCourierOption!['etd'],
       );
 
       if (response.containsKey('snap_token') &&
@@ -98,59 +137,242 @@ class _CheckoutPageState extends State<CheckoutPage> {
           },
         );
       } else {
-        throw Exception('Snap token/order_id tidak tersedia di response');
+        throw Exception('Snap token/order_id tidak tersedia');
       }
     } catch (e) {
-      print("❌ Gagal saat checkout: $e");
+      print("❌ Error saat checkout: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Gagal memproses pembayaran")),
       );
     }
   }
 
-  List<String> _generateDateRange(int days) {
-    final now = DateTime.now();
-    final start = now.add(Duration(days: days));
-    final end = now.add(Duration(days: days + 3));
-    final dateFormat = DateFormat('d');
-    final monthFormat = DateFormat('MMM');
-    return [
-      "${dateFormat.format(start)} - ${dateFormat.format(end)} ${monthFormat.format(end)}",
-    ];
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Text(
+        title,
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      ),
+    );
   }
 
-  void _showCourierOptions() {
-    showModalBottomSheet(
-      context: context,
-      builder:
-          (context) => ListView(
-            shrinkWrap: true,
-            children:
-                courierEstimates.entries.map((entry) {
-                  return ListTile(
-                    leading: const Icon(Icons.local_shipping_outlined),
-                    title: Text(entry.key),
-                    subtitle: Text(
-                      "Estimasi: ${_generateDateRange(entry.value).first}",
-                    ),
-                    onTap: () {
-                      setState(() {
-                        selectedCourier = entry.key;
-                      });
-                      Navigator.pop(context);
-                    },
+  Widget _buildAddressBox() {
+    final name = selectedAddress?['nama'] ?? '-';
+    final phone = selectedAddress?['no_whatsapp'] ?? '-';
+    final address = selectedAddress?['alamat'] ?? '-';
+    final city = selectedAddress?['kota_nama'] ?? '-';
+    final province = selectedAddress?['provinsi_nama'] ?? '-';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(phone),
+            const SizedBox(height: 8),
+            Text(address),
+            Text('$city, $province'),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const DaftarAlamatPage()),
                   );
-                }).toList(),
+                  await _loadPrimaryAddress(override: result);
+                },
+                icon: const Icon(Icons.edit, size: 16),
+                label: const Text("Ubah Alamat"),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProductSummary() {
+    return Column(
+      children:
+          widget.selectedItems.map((item) {
+            return ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 8,
+                horizontal: 12,
+              ),
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  item['image'] ?? '',
+                  width: 50,
+                  height: 50,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+                ),
+              ),
+              title: Text(item['name'] ?? '-'),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Qty: ${item['quantity']}"),
+                  Text("Harga: ${formatCurrency.format(item['price'])}"),
+                ],
+              ),
+            );
+          }).toList(),
+    );
+  }
+
+  Widget _buildCourierSelector() {
+    return DropdownButtonFormField<String>(
+      decoration: const InputDecoration(labelText: 'Pilih Kurir'),
+      value: selectedCourierCode,
+      items: const [
+        DropdownMenuItem(value: 'jne', child: Text('JNE')),
+        DropdownMenuItem(value: 'tiki', child: Text('TIKI')),
+        DropdownMenuItem(value: 'pos', child: Text('POS Indonesia')),
+      ],
+      onChanged: (value) {
+        setState(() {
+          selectedCourierCode = value;
+          selectedCourierOption = null;
+          courierOptions = [];
+        });
+        _loadCourierOptions();
+      },
+    );
+  }
+
+  Widget _buildCourierCard() {
+    if (isLoadingCourier) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(12.0),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    return courierOptions.isEmpty
+        ? const Text("Tidak ada layanan tersedia")
+        : Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children:
+              courierOptions.map((option) {
+                final label = "${option['service']} - ${option['etd']} hari";
+                final cost = option['cost'];
+                final isSelected = selectedCourierOption == option;
+
+                return ListTile(
+                  leading: const Icon(Icons.local_shipping),
+                  title: Text(label),
+                  subtitle: Text(
+                    formatCurrency.format((cost as num).toDouble()),
+                  ),
+
+                  trailing:
+                      isSelected
+                          ? const Icon(Icons.check_circle, color: Colors.green)
+                          : null,
+                  onTap: () {
+                    setState(() {
+                      selectedCourierOption = option;
+                    });
+                  },
+                );
+              }).toList(),
+        );
+  }
+
+  Widget _buildFooter(double subtotal, double ongkir, double total) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Subtotal'),
+              Text(formatCurrency.format(subtotal)),
+            ],
           ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Ongkir'),
+              Text(formatCurrency.format(ongkir)),
+            ],
+          ),
+          const Divider(),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Total',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Text(
+                formatCurrency.format(total),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton(
+            onPressed:
+                isProcessing
+                    ? null
+                    : () async {
+                      setState(() => isProcessing = true);
+                      final subtotal = widget.selectedItems.fold<double>(
+                        0.0,
+                        (sum, item) =>
+                            sum +
+                            ((item['price'] as num) * (item['quantity'] ?? 1)),
+                      );
+                      await _bayarSekarang(subtotal);
+                      setState(() => isProcessing = false);
+                    },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Bayar Sekarang',
+              style: TextStyle(fontSize: 16, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    double totalPrice = widget.selectedItems.fold(
-      0,
+    final subtotal = widget.selectedItems.fold<double>(
+      0.0,
       (sum, item) => sum + ((item['price'] as num) * (item['quantity'] ?? 1)),
     );
+    final ongkir = (selectedCourierOption?['cost'] ?? 0).toDouble();
+
+    final total = subtotal + ongkir;
 
     return Scaffold(
       appBar: const CustomNavbar(
@@ -163,304 +385,42 @@ class _CheckoutPageState extends State<CheckoutPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionTitle('Alamat Pengiriman'),
+            _buildSectionTitle("Alamat Pengiriman"),
             _buildAddressBox(),
-            const SizedBox(height: 20),
-            _buildSectionTitle('Ringkasan Produk'),
+            _buildSectionTitle("Produk Dibeli"),
             _buildProductSummary(),
-            const SizedBox(height: 20),
-            _buildSectionTitle('Pengiriman'),
+            _buildSectionTitle("Kurir Pengiriman"),
+            _buildCourierSelector(),
+            const SizedBox(height: 12),
             _buildCourierCard(),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-      bottomNavigationBar: _buildFooter(totalPrice),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-    );
-  }
-
-  Widget _buildAddressBox() {
-    final name = selectedAddress?['nama'] ?? '-';
-    final phone = selectedAddress?['no_whatsapp'] ?? '-';
-    final address = selectedAddress?['alamat'] ?? '-';
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Alamat Pengiriman',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            _buildSectionTitle("Ringkasan"),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade300),
               ),
-              IconButton(
-                icon: const Icon(Icons.edit_outlined, color: Colors.black54),
-                onPressed: () async {
-                  final selected = await Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const DaftarAlamatPage()),
-                  );
-
-                  await _loadPrimaryAddress(override: selected);
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              const Icon(Icons.person_outline, size: 20, color: Colors.black54),
-              const SizedBox(width: 8),
-              Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              const Icon(Icons.phone_outlined, size: 20, color: Colors.black54),
-              const SizedBox(width: 8),
-              Text(phone, style: const TextStyle(fontSize: 14)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(
-                Icons.location_on_outlined,
-                size: 20,
-                color: Colors.black54,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(address, style: const TextStyle(fontSize: 14)),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProductSummary() {
-    return Column(
-      children:
-          widget.selectedItems.map((item) {
-            return Column(
-              children: [
-                Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        item['image'] ?? '',
-                        width: 50,
-                        height: 50,
-                        fit: BoxFit.cover,
-                        errorBuilder:
-                            (_, __, ___) => const Icon(Icons.broken_image),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item['name'] ?? '',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            formatCurrency.format(item['price']),
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.red,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            "Qty: ${item['quantity'] ?? 1}",
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const Divider(thickness: 1, height: 20),
-              ],
-            );
-          }).toList(),
-    );
-  }
-
-  Widget _buildCourierCard() {
-    final estDate =
-        selectedCourier != null
-            ? _generateDateRange(courierEstimates[selectedCourier!]!).first
-            : '-';
-
-    return GestureDetector(
-      onTap: _showCourierOptions,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade900,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text("Subtotal: ${formatCurrency.format(subtotal)}"),
+                  Text("Ongkir: ${formatCurrency.format(ongkir)}"),
+                  const Divider(),
                   Text(
-                    "Estimasi tiba: $estDate",
+                    "Total: ${formatCurrency.format(total)}",
                     style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    selectedCourier != null
-                        ? "Pengiriman ${selectedCourier!}"
-                        : "Pilih Pengiriman",
-                    style: TextStyle(color: Colors.grey.shade300, fontSize: 14),
                   ),
                 ],
               ),
             ),
-            Row(
-              children: const [
-                Icon(Icons.local_shipping_outlined, color: Color(0xFF00FFB0)),
-                SizedBox(width: 6),
-                Text(
-                  "Gratis",
-                  style: TextStyle(
-                    color: Color(0xFF00FFB0),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildFooter(double totalPrice) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 5,
-            offset: Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Total: ',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              Text(
-                formatCurrency.format(totalPrice),
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.red,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed:
-                  isProcessing
-                      ? null
-                      : () async {
-                        setState(() => isProcessing = true);
-                        double totalPrice = widget.selectedItems.fold<double>(
-                          0.0,
-                          (sum, item) =>
-                              sum +
-                              ((item['price'] as num) *
-                                  (item['quantity'] ?? 1)),
-                        );
-                        await _bayarSekarang(totalPrice);
-                        setState(() => isProcessing = false);
-                      },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color.fromARGB(255, 0, 0, 0),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Bayar Sekarang',
-                style: TextStyle(fontSize: 16, color: Colors.white),
-              ),
-            ),
-          ),
-        ],
-      ),
+      bottomNavigationBar: _buildFooter(subtotal, ongkir, total),
     );
   }
 }

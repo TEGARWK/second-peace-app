@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../screens/cart_page.dart';
 import '../screens/notification_page.dart';
+import 'package:secondpeacem/providers/notification_provider.dart';
 
 class CustomNavbar extends StatelessWidget implements PreferredSizeWidget {
   final bool isDetailPage;
@@ -114,30 +115,55 @@ class CustomNavbar extends StatelessWidget implements PreferredSizeWidget {
                         color: Colors.white,
                       ),
                     ),
-                    // Dummy notif badge
-                    Positioned(
-                      right: 6,
-                      top: 6,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 20,
-                          minHeight: 20,
-                        ),
-                        child: const Text(
-                          '3', // Ganti dengan provider jika sudah ada
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
+                    Consumer<NotificationProvider>(
+                      builder: (context, notifProvider, _) {
+                        return Stack(
+                          children: [
+                            IconButton(
+                              onPressed: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const NotificationPage(),
+                                  ),
+                                );
+                                await context
+                                    .read<NotificationProvider>()
+                                    .fetchUnreadCount();
+                              },
+                              icon: const Icon(
+                                Icons.notifications_none,
+                                color: Colors.white,
+                              ),
+                            ),
+                            if (notifProvider.unreadCount > 0)
+                              Positioned(
+                                right: 6,
+                                top: 6,
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  constraints: const BoxConstraints(
+                                    minWidth: 20,
+                                    minHeight: 20,
+                                  ),
+                                  child: Text(
+                                    '${notifProvider.unreadCount}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),

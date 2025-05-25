@@ -2,7 +2,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/product.dart';
 
-const String baseUrl = 'https://secondpeace.my.id/api/v1';
+//const String baseUrl = 'https://secondpeace.my.id/api/v1';
+const String baseUrl = 'http://10.0.2.2:8000/api/v1';
 
 class ProductService {
   Future<List<Product>> fetchProducts({String? kategori}) async {

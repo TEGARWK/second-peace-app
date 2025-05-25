@@ -1,101 +1,219 @@
 import 'package:flutter/material.dart';
+import 'package:secondpeacem/services/notification_service.dart';
+import 'package:secondpeacem/providers/notification_provider.dart';
+import 'package:provider/provider.dart';
+import 'dart:convert';
 
-class NotificationPage extends StatelessWidget {
+class NotificationPage extends StatefulWidget {
   const NotificationPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final List<Map<String, dynamic>> notifications = [
-      {
-        "title": "Promo Spesial!",
-        "message": "Dapatkan diskon 25% untuk semua produk hari ini.",
-        "icon": Icons.local_offer,
-        "time": "10 menit yang lalu",
-      },
-      {
-        "title": "Pesanan Dikirim",
-        "message":
-            "Pesananmu #A12345 telah dikirim dan sedang dalam perjalanan.",
-        "icon": Icons.local_shipping,
-        "time": "1 jam yang lalu",
-      },
-      {
-        "title": "Update Aplikasi",
-        "message": "Versi baru Second Peace kini tersedia. Yuk update!",
-        "icon": Icons.system_update,
-        "time": "2 jam yang lalu",
-      },
-    ];
+  State<NotificationPage> createState() => _NotificationPageState();
+}
 
+class _NotificationPageState extends State<NotificationPage> {
+  final _notificationService = NotificationService();
+  List<Map<String, dynamic>> notifications = [];
+  bool loading = true;
+
+  IconData getIconFromStatus(String status) {
+    final s = status.trim().toLowerCase();
+
+    if (s.contains('dikirim')) return Icons.local_shipping;
+    if (s.contains('diterima')) return Icons.check_circle_outline;
+    if (s.contains('dibatalkan')) return Icons.cancel;
+    if (s.contains('menunggu')) return Icons.access_time;
+    if (s.contains('diproses')) return Icons.settings;
+
+    return Icons.notifications;
+  }
+
+  String getStatusFromNotif(Map<String, dynamic> notif) {
+    final data = notif['data'];
+    if (data == null) return '';
+    try {
+      final parsed = data is String ? jsonDecode(data) : data;
+      final status = parsed['status_pesanan']?.toString() ?? '';
+      print('🔍 Status dari notif: $status');
+      return status;
+    } catch (e) {
+      print('❌ Gagal parsing status_pesanan: $e');
+      return '';
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
+  Future<void> _loadNotifications() async {
+    try {
+      final data = await _notificationService.fetchNotifications();
+      setState(() {
+        notifications = data;
+        loading = false;
+      });
+
+      // tandai sebagai dibaca (opsional bisa dibuat lebih presisi)
+      for (var n in data.where((n) => (n['is_read'] ?? 0) == 0)) {
+        await _notificationService.markAsRead(n['id']);
+      }
+      if (mounted) {
+        context.read<NotificationProvider>().markAllAsRead();
+      }
+    } catch (e) {
+      setState(() {
+        loading = false;
+      });
+    }
+  }
+
+  Future<void> _markAsReadAndRefresh(int notifId) async {
+    await _notificationService.markAsRead(notifId);
+    await _loadNotifications(); // refresh agar titik merah hilang
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text(
-          "Notifikasi",
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
+        title: const Text("Notifikasi", style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.black,
-        elevation: 0,
       ),
       backgroundColor: const Color(0xFFF5F5F5),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: notifications.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final notif = notifications[index];
-          return Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.15),
-                  spreadRadius: 1,
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
+      body:
+          loading
+              ? const Center(child: CircularProgressIndicator())
+              : notifications.isEmpty
+              ? const Center(child: Text("Belum ada notifikasi"))
+              : ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: notifications.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  final notif = notifications[index];
+                  final status = getStatusFromNotif(notif);
+                  final icon = getIconFromStatus(status);
+                  print("Icon untuk status '$status': $icon");
+
+                  return GestureDetector(
+                    onTap: () async {
+                      print(
+                        "Notifikasi diklik: ${notif['type']}, data: ${notif['data']}",
+                      );
+
+                      await _markAsReadAndRefresh(notif['id']);
+
+                      if (notif['type'] == 'pesanan') {
+                        if (notif['data'] == null) {
+                          print("⚠️ Notifikasi pesanan tapi data null");
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Data pesanan tidak tersedia"),
+                            ),
+                          );
+                          return;
+                        }
+
+                        try {
+                          final data =
+                              notif['data'] is String
+                                  ? Map<String, dynamic>.from(
+                                    jsonDecode(notif['data']),
+                                  )
+                                  : notif['data'];
+
+                          final detail = await _notificationService
+                              .fetchOrderDetail(data['id_pesanan']);
+
+                          if (!mounted) return;
+
+                          final status = detail['status_pesanan'];
+                          Navigator.pushNamed(
+                            context,
+                            '/order-detail',
+                            arguments: {
+                              ...detail,
+                              'status': detail['status_pesanan'],
+                            },
+                          );
+
+                          print("Navigasi ke pesanan ${data['id_pesanan']}");
+                        } catch (e) {
+                          print("❌ Gagal decode data: $e");
+                        }
+                      }
+                    },
+
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.15),
+                            spreadRadius: 1,
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        leading: Stack(
+                          children: [
+                            CircleAvatar(
+                              backgroundColor: Colors.black,
+                              child: Icon(icon, color: Colors.white),
+                            ),
+                            if ((notif['is_read'] ?? 0) == 0)
+                              Positioned(
+                                right: 0,
+                                top: 0,
+                                child: Container(
+                                  width: 10,
+                                  height: 10,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        title: Text(
+                          notif['title'],
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 4),
+                            Text(notif['message']),
+                            const SizedBox(height: 6),
+                            Text(
+                              notif['created_at'] ?? '',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
-              leading: CircleAvatar(
-                backgroundColor: Colors.black,
-                child: Icon(notif['icon'], color: Colors.white),
-              ),
-              title: Text(
-                notif['title'],
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 4),
-                  Text(
-                    notif['message'],
-                    style: const TextStyle(color: Colors.black87),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    notif['time'],
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
     );
   }
 }
