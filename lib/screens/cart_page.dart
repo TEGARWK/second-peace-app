@@ -8,6 +8,7 @@ import '../models/product.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CartPage extends StatefulWidget {
   const CartPage({super.key});
@@ -322,7 +323,46 @@ class _CartPageState extends State<CartPage> {
               ),
               minimumSize: const Size(double.infinity, 50),
             ),
-            onPressed: () {
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+
+              if (!isLoggedIn) {
+                showDialog(
+                  context: context,
+                  builder:
+                      (context) => AlertDialog(
+                        title: const Text("Login Diperlukan"),
+                        content: const Text(
+                          "Silakan login terlebih dahulu untuk melanjutkan ke checkout.",
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text(
+                              "Batal",
+                              style: TextStyle(color: Colors.black),
+                            ),
+                          ),
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context); // tutup dialog
+                              Navigator.pushNamed(context, '/login');
+                            },
+                            child: const Text(
+                              "Login",
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                );
+                return;
+              }
+
               final selectedItems =
                   cartProvider.items
                       .where(
@@ -364,6 +404,7 @@ class _CartPageState extends State<CartPage> {
                 );
               }
             },
+
             child: const Text(
               'Checkout',
               style: TextStyle(fontSize: 16, color: Colors.white),

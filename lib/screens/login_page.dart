@@ -132,9 +132,23 @@ class _LoginPageState extends State<LoginPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TextButton.icon(
-                onPressed: () {
-                  Navigator.pop(context);
+                onPressed: () async {
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  } else {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setInt(
+                      'navIndex',
+                      2,
+                    ); // buka tab Akun di MainScreen
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      '/',
+                      (route) => false,
+                    );
+                  }
                 },
+
                 icon: const Icon(
                   Icons.arrow_back_ios_new_rounded,
                   color: Colors.black,
@@ -144,6 +158,7 @@ class _LoginPageState extends State<LoginPage> {
                   style: TextStyle(color: Colors.black, fontSize: 16),
                 ),
               ),
+
               const Text(
                 'LogIn',
                 style: TextStyle(fontSize: 50, fontWeight: FontWeight.bold),

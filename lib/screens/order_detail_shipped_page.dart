@@ -3,7 +3,6 @@ import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:secondpeacem/services/shipping_service.dart';
 
 class OrderDetailShippedPage extends StatefulWidget {
@@ -91,19 +90,6 @@ class _OrderDetailShippedPageState extends State<OrderDetailShippedPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Gagal memperbarui status pesanan')),
       );
-    }
-  }
-
-  String _getTrackingUrl(String ekspedisi, String resi) {
-    switch (ekspedisi.toLowerCase()) {
-      case 'jne':
-        return 'https://www.jne.co.id/id/tracking/trace/$resi';
-      case 'j&t':
-        return 'https://www.jet.co.id/track?awb=$resi';
-      case 'sicepat':
-        return 'https://www.sicepat.com/checkAwb?awb=$resi';
-      default:
-        return 'https://google.com/search?q=cek+resi+$resi';
     }
   }
 

@@ -46,6 +46,15 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  // Fungsi untuk me-refresh data produk
+  Future<void> _loadData() async {
+    setState(() {
+      _productFuture = ProductService().fetchProducts(
+        kategori: _selectedCategory,
+      );
+    });
+  }
+
   void _filterByCategory(String kategori) {
     setState(() {
       _selectedCategory = kategori;
@@ -66,6 +75,7 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  // Fungsi formatRupiah
   String formatRupiah(double price) {
     final format = NumberFormat.currency(
       locale: 'id_ID',
@@ -82,173 +92,175 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: CustomScrollView(
-          controller: _scrollController,
-          slivers: [
-            // Search & Kategori Button
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        decoration: InputDecoration(
-                          hintText: 'Cari produk...',
-                          prefixIcon: const Icon(Icons.search),
-                          contentPadding: const EdgeInsets.all(12),
-                          filled: true,
-                          fillColor: Colors.grey[100],
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    GestureDetector(
-                      onTap: _toggleCategory,
-
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.category),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Animated Category
-            SliverToBoxAdapter(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                switchInCurve: Curves.easeInOut,
-                switchOutCurve: Curves.easeInOut,
-                transitionBuilder: (child, animation) {
-                  final offsetAnimation = Tween<Offset>(
-                    begin: const Offset(0, -0.2),
-                    end: Offset.zero,
-                  ).animate(animation);
-                  return FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(
-                      position: offsetAnimation,
-                      child: child,
-                    ),
-                  );
-                },
-                child:
-                    _showCategories
-                        ? Padding(
-                          key: const ValueKey(true),
-                          padding: const EdgeInsets.only(top: 8, left: 16),
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children:
-                                  categories.map((label) {
-                                    return GestureDetector(
-                                      onTap: () => _filterByCategory(label),
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                        ),
-                                        child: Column(
-                                          children: [
-                                            CircleAvatar(
-                                              radius: 26,
-                                              backgroundImage: AssetImage(
-                                                'assets/$label.jpg',
-                                              ),
-                                            ),
-                                            const SizedBox(height: 6),
-                                            Text(
-                                              label[0].toUpperCase() +
-                                                  label.substring(1),
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.bold,
-                                                color:
-                                                    _selectedCategory == label
-                                                        ? Colors.black
-                                                        : Colors.grey[700],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  }).toList(),
+        child: RefreshIndicator(
+          onRefresh: _loadData, // Fungsi yang dipanggil saat pull-to-refresh
+          child: CustomScrollView(
+            controller: _scrollController,
+            slivers: [
+              // Search & Kategori Button
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          decoration: InputDecoration(
+                            hintText: 'Cari produk...',
+                            prefixIcon: const Icon(Icons.search),
+                            contentPadding: const EdgeInsets.all(12),
+                            filled: true,
+                            fillColor: Colors.grey[100],
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
                             ),
                           ),
-                        )
-                        : const SizedBox.shrink(key: ValueKey(false)),
-              ),
-            ),
-
-            const SliverToBoxAdapter(child: SizedBox(height: 12)),
-
-            // Produk Grid dari data langsung (tanpa FutureBuilder)
-            SliverToBoxAdapter(
-              child: FutureBuilder<List<Product>>(
-                future: _productFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-
-                  if (snapshot.hasError) {
-                    return Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Center(
-                        child: Text('Gagal memuat produk: ${snapshot.error}'),
-                      ),
-                    );
-                  }
-
-                  final products = snapshot.data ?? [];
-
-                  if (products.isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Center(
-                        child: Text('Tidak ada produk untuk kategori ini.'),
-                      ),
-                    );
-                  }
-
-                  return GridView.builder(
-                    physics: const NeverScrollableScrollPhysics(),
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: products.length,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount:
-                          MediaQuery.of(context).size.width > 600 ? 3 : 2,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      childAspectRatio: 0.75,
-                    ),
-                    itemBuilder:
-                        (context, index) => _buildProductItem(
-                          context,
-                          products[index],
-                          products,
                         ),
-                  );
-                },
+                      ),
+                      const SizedBox(width: 12),
+                      GestureDetector(
+                        onTap: _toggleCategory,
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.category),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ],
+
+              // Animated Category
+              SliverToBoxAdapter(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  switchInCurve: Curves.easeInOut,
+                  switchOutCurve: Curves.easeInOut,
+                  transitionBuilder: (child, animation) {
+                    final offsetAnimation = Tween<Offset>(
+                      begin: const Offset(0, -0.2),
+                      end: Offset.zero,
+                    ).animate(animation);
+                    return FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(
+                        position: offsetAnimation,
+                        child: child,
+                      ),
+                    );
+                  },
+                  child:
+                      _showCategories
+                          ? Padding(
+                            key: const ValueKey(true),
+                            padding: const EdgeInsets.only(top: 8, left: 16),
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children:
+                                    categories.map((label) {
+                                      return GestureDetector(
+                                        onTap: () => _filterByCategory(label),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              CircleAvatar(
+                                                radius: 26,
+                                                backgroundImage: AssetImage(
+                                                  'assets/$label.jpg',
+                                                ),
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Text(
+                                                label[0].toUpperCase() +
+                                                    label.substring(1),
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.bold,
+                                                  color:
+                                                      _selectedCategory == label
+                                                          ? Colors.black
+                                                          : Colors.grey[700],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                              ),
+                            ),
+                          )
+                          : const SizedBox.shrink(key: ValueKey(false)),
+                ),
+              ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 12)),
+
+              // Produk Grid dari data langsung (tanpa FutureBuilder)
+              SliverToBoxAdapter(
+                child: FutureBuilder<List<Product>>(
+                  future: _productFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+
+                    if (snapshot.hasError) {
+                      return Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Center(
+                          child: Text('Gagal memuat produk: ${snapshot.error}'),
+                        ),
+                      );
+                    }
+
+                    final products = snapshot.data ?? [];
+
+                    if (products.isEmpty) {
+                      return const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: Center(
+                          child: Text('Tidak ada produk untuk kategori ini.'),
+                        ),
+                      );
+                    }
+
+                    return GridView.builder(
+                      physics: const NeverScrollableScrollPhysics(),
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: products.length,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount:
+                            MediaQuery.of(context).size.width > 600 ? 3 : 2,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: 0.75,
+                      ),
+                      itemBuilder:
+                          (context, index) => _buildProductItem(
+                            context,
+                            products[index],
+                            products,
+                          ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

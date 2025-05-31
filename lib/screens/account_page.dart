@@ -190,7 +190,22 @@ class _AccountPageState extends State<AccountPage> {
           children: [
             IconButton(
               icon: const Icon(Icons.chat, color: Colors.white),
-              onPressed: () {
+              onPressed: () async {
+                SharedPreferences prefs = await SharedPreferences.getInstance();
+                bool loggedIn = prefs.getBool('isLoggedIn') ?? false;
+
+                if (!loggedIn) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Silakan login terlebih dahulu untuk membuka chat.',
+                      ),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                  return;
+                }
+
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const ChatPage()),
@@ -199,6 +214,7 @@ class _AccountPageState extends State<AccountPage> {
                 });
               },
             ),
+
             if (hasUnreadChat)
               Positioned(
                 top: 8,

@@ -193,7 +193,51 @@ class _DetailPageState extends State<DetailPage> {
         children: [
           Expanded(
             child: ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
+                final prefs = await SharedPreferences.getInstance();
+                final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+
+                if (!isLoggedIn) {
+                  // ✅ Tampilkan dialog login
+                  showDialog(
+                    context: context,
+                    builder:
+                        (_) => AlertDialog(
+                          title: const Text("Login Diperlukan"),
+                          content: const Text(
+                            "Silakan login terlebih dahulu untuk melakukan pembelian.",
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              child: const Text(
+                                "Batal",
+                                style: TextStyle(color: Colors.black),
+                              ),
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.of(context).pop(); // tutup dialog
+                                Navigator.pushNamed(
+                                  context,
+                                  '/login',
+                                ); // arahkan ke login
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.black,
+                              ),
+                              child: const Text(
+                                "Login",
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                  );
+                  return;
+                }
+
+                // ✅ Jika login, lanjut ke checkout
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -212,6 +256,7 @@ class _DetailPageState extends State<DetailPage> {
                   ),
                 );
               },
+
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.black,
                 shape: RoundedRectangleBorder(

@@ -42,6 +42,17 @@ class _NotificationPageState extends State<NotificationPage> {
     }
   }
 
+  IconData getIconFromType(String type) {
+    switch (type) {
+      case 'chat':
+        return Icons.chat_bubble_outline;
+      case 'pesanan':
+        return Icons.local_shipping;
+      default:
+        return Icons.notifications;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -95,9 +106,7 @@ class _NotificationPageState extends State<NotificationPage> {
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final notif = notifications[index];
-                  final status = getStatusFromNotif(notif);
-                  final icon = getIconFromStatus(status);
-                  print("Icon untuk status '$status': $icon");
+                  final icon = getIconFromType(notif['type'] ?? '');
 
                   return GestureDetector(
                     onTap: () async {
@@ -131,7 +140,6 @@ class _NotificationPageState extends State<NotificationPage> {
 
                           if (!mounted) return;
 
-                          final status = detail['status_pesanan'];
                           Navigator.pushNamed(
                             context,
                             '/order-detail',
@@ -145,6 +153,8 @@ class _NotificationPageState extends State<NotificationPage> {
                         } catch (e) {
                           print("❌ Gagal decode data: $e");
                         }
+                      } else if (notif['type'] == 'chat') {
+                        Navigator.pushNamed(context, '/chat');
                       }
                     },
 

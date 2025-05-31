@@ -51,6 +51,7 @@ class CustomNavbar extends StatelessWidget implements PreferredSizeWidget {
             title: _buildTitleOrLogo(),
             actions: [
               if (showCart) ...[
+                // 🛒 Keranjang
                 Consumer<CartProvider>(
                   builder: (context, cart, child) {
                     return Stack(
@@ -98,74 +99,58 @@ class CustomNavbar extends StatelessWidget implements PreferredSizeWidget {
                     );
                   },
                 ),
-                // Notifikasi (sementara belum real-time, tapi bisa disiapkan untuk provider juga)
-                Stack(
-                  children: [
-                    IconButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const NotificationPage(),
+
+                // 🔔 Notifikasi
+                Consumer<NotificationProvider>(
+                  builder: (context, notifProvider, _) {
+                    return Stack(
+                      children: [
+                        IconButton(
+                          onPressed: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const NotificationPage(),
+                              ),
+                            );
+                            // refresh jumlah notifikasi setelah kembali dari halaman
+                            await context
+                                .read<NotificationProvider>()
+                                .fetchUnreadCount();
+                          },
+                          icon: const Icon(
+                            Icons.notifications_none,
+                            color: Colors.white,
                           ),
-                        );
-                      },
-                      icon: const Icon(
-                        Icons.notifications_none,
-                        color: Colors.white,
-                      ),
-                    ),
-                    Consumer<NotificationProvider>(
-                      builder: (context, notifProvider, _) {
-                        return Stack(
-                          children: [
-                            IconButton(
-                              onPressed: () async {
-                                await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const NotificationPage(),
-                                  ),
-                                );
-                                await context
-                                    .read<NotificationProvider>()
-                                    .fetchUnreadCount();
-                              },
-                              icon: const Icon(
-                                Icons.notifications_none,
-                                color: Colors.white,
+                        ),
+                        if (notifProvider.unreadCount > 0)
+                          Positioned(
+                            right: 6,
+                            top: 6,
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 20,
+                                minHeight: 20,
+                              ),
+                              child: Text(
+                                '${notifProvider.unreadCount}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
                             ),
-                            if (notifProvider.unreadCount > 0)
-                              Positioned(
-                                right: 6,
-                                top: 6,
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.red,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  constraints: const BoxConstraints(
-                                    minWidth: 20,
-                                    minHeight: 20,
-                                  ),
-                                  child: Text(
-                                    '${notifProvider.unreadCount}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        );
-                      },
-                    ),
-                  ],
+                          ),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(width: 8),
               ],

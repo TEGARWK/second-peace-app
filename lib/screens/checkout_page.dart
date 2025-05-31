@@ -4,6 +4,7 @@ import '../widgets/custom_navbar.dart';
 import '../services/auth_service.dart';
 import '../services/shipping_service.dart';
 import 'alamat_list.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CheckoutPage extends StatefulWidget {
   final List<Map<String, dynamic>> selectedItems;
@@ -31,6 +32,25 @@ class _CheckoutPageState extends State<CheckoutPage> {
   @override
   void initState() {
     super.initState();
+    _cekLoginStatus();
+  }
+
+  Future<void> _cekLoginStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+
+    if (!isLoggedIn) {
+      // Navigasi balik ke halaman login
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Silakan login terlebih dahulu')),
+        );
+        Navigator.pushReplacementNamed(context, '/login');
+      }
+      return;
+    }
+
+    // Jika sudah login, lanjut load alamat
     _loadPrimaryAddress();
   }
 
@@ -186,8 +206,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   );
                   await _loadPrimaryAddress(override: result);
                 },
-                icon: const Icon(Icons.edit, size: 16),
-                label: const Text("Ubah Alamat"),
+                icon: const Icon(Icons.edit, color: Colors.black, size: 16),
+                label: const Text(
+                  "Ubah Alamat",
+                  style: TextStyle(color: Colors.black, fontSize: 14),
+                ),
               ),
             ),
           ],
@@ -215,12 +238,18 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
                 ),
               ),
-              title: Text(item['name'] ?? '-'),
+              title: Text(
+                item['name'] ?? '-',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text("Qty: ${item['quantity']}"),
-                  Text("Harga: ${formatCurrency.format(item['price'])}"),
+                  Text(
+                    "Harga: ${formatCurrency.format(item['price'])}",
+                    style: const TextStyle(fontSize: 14),
+                  ),
                 ],
               ),
             );

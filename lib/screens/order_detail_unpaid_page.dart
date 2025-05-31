@@ -177,7 +177,7 @@ class OrderDetailUnpaidPage extends StatelessWidget {
             const Icon(Icons.timer_outlined, color: Colors.red),
             const SizedBox(width: 8),
             Text(
-              "Batas bayar: \${formatDateTime(expiredAt)}",
+              "Batas bayar: ${formatDateTime(expiredAt)}",
               style: const TextStyle(fontSize: 13, color: Colors.red),
             ),
           ],
@@ -251,7 +251,7 @@ class OrderDetailUnpaidPage extends StatelessWidget {
                   Text("Jumlah: $jumlah"),
                   Text("Ukuran: $ukuran"),
                   Text(
-                    "Harga: \${formatCurrency(harga)}",
+                    "Harga: ${formatCurrency(harga)}",
                     style: const TextStyle(
                       color: Colors.red,
                       fontWeight: FontWeight.w500,
@@ -271,49 +271,51 @@ class OrderDetailUnpaidPage extends StatelessWidget {
     required String alamat,
     required String whatsapp,
     required String tanggal,
-  }) => Card(
-    elevation: 2,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    child: Padding(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.person_outline),
-              const SizedBox(width: 8),
-              Text("Penerima: $penerima"),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const Icon(Icons.phone_android),
-              const SizedBox(width: 8),
-              Text("WhatsApp: $whatsapp"),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const Icon(Icons.location_on_outlined),
-              const SizedBox(width: 8),
-              Flexible(child: Text("Alamat: $alamat")),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const Icon(Icons.access_time),
-              const SizedBox(width: 8),
-              Text("Tanggal Pesan: $tanggal"),
-            ],
-          ),
-        ],
+  }) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.person_outline),
+                const SizedBox(width: 8),
+                Text("Penerima: $penerima"),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.phone_android),
+                const SizedBox(width: 8),
+                Text("WhatsApp: $whatsapp"),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.location_on_outlined),
+                const SizedBox(width: 8),
+                Flexible(child: Text("Alamat: $alamat")),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.access_time),
+                const SizedBox(width: 8),
+                Text("Tanggal Pesan: $tanggal"),
+              ],
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   Widget _buildRingkasanPembayaran({
     required double subtotal,

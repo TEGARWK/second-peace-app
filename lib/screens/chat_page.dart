@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/chat_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'dart:convert';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({Key? key}) : super(key: key);
@@ -9,6 +10,8 @@ class ChatPage extends StatefulWidget {
   @override
   State<ChatPage> createState() => _ChatPageState();
 }
+
+const String baseUrl = 'http://10.0.2.2:8000'; // untuk development
 
 class _ChatPageState extends State<ChatPage> {
   final TextEditingController _controller = TextEditingController();
@@ -84,17 +87,22 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Widget _buildMessage(Map<String, dynamic> msg) {
+    print("💬 MSG: ${jsonEncode(msg)}");
+
     final sender = msg['sender'];
     final isMe = sender != null && sender['id'] == _chatUserId;
     final time = DateFormat(
       'HH:mm',
     ).format(DateTime.tryParse(msg['created_at'] ?? '') ?? DateTime.now());
     final hasMedia = msg['media_path'] != null;
-    final isImage = msg['media_type'] == 'image';
-    final mediaUrl =
-        hasMedia
-            ? 'https://secondpeace.my.id/storage/${msg['media_path']}'
-            : null;
+    final isImage =
+        (msg['media_type'] ?? '').toString().trim().toLowerCase() == 'image';
+    //final mediaUrl =
+    //hasMedia
+    //? 'https://secondpeace.my.id/storage/${msg['media_path']}'
+    //: null;
+
+    final mediaUrl = hasMedia ? '$baseUrl/storage/${msg['media_path']}' : null;
 
     final bubbleColor = isMe ? const Color(0xFFDCF8C6) : Colors.white;
     final textColor = isMe ? Colors.black87 : Colors.black;
@@ -109,7 +117,14 @@ class _ChatPageState extends State<ChatPage> {
     Widget content =
         hasMedia
             ? isImage
-                ? Image.network(mediaUrl!, width: 180, fit: BoxFit.cover)
+                ? Image.network(
+                  mediaUrl!,
+                  width: 180,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Text('🛑 Gagal memuat gambar');
+                  },
+                )
                 : const Text('[Video tidak ditampilkan]')
             : Text(
               msg['message'] ?? '',

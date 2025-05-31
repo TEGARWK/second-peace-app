@@ -20,6 +20,7 @@ import 'package:secondpeacem/screens/order_detail_shipped_page.dart';
 import 'package:secondpeacem/screens/order_detail_received_page.dart';
 import 'package:secondpeacem/screens/order_detail_cancelled_page.dart';
 import 'package:secondpeacem/screens/order_detail_unpaid_page.dart';
+import 'package:secondpeacem/screens/chat_page.dart';
 
 // ✅ Tambahkan RouteObserver global
 final RouteObserver<ModalRoute<void>> routeObserver =
@@ -137,6 +138,7 @@ class SecondPeaceApp extends StatelessWidget {
             body: Center(child: Text("Data notifikasi tidak valid")),
           );
         },
+        '/chat': (context) => const ChatPage(),
       },
     );
   }
@@ -149,32 +151,48 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen> with RouteAware {
   int _selectedIndex = 0;
   late final List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
-    _checkAuthStatus();
+    _pages = [ProductWrapper(), const OrdersPage(), const AccountPage()];
     _loadNavIndex();
-    _pages = [
-      ProductWrapper(),
-      const OrdersPage(), // ✅ OrdersPage sudah mendukung RouteAware
-      const AccountPage(),
-    ];
   }
 
-  Future<void> _checkAuthStatus() async {
-    final prefs = await SharedPreferences.getInstance();
-    final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-    if (!isLoggedIn) {
-      if (mounted) {
-        Navigator.of(
-          context,
-        ).pushNamedAndRemoveUntil('/login', (route) => false);
-      }
-    }
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Panggil sekali saat build awal
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<NotificationProvider>().fetchUnreadCount();
+    });
+
+    // Subscribe route observer
+    routeObserver.subscribe(this, ModalRoute.of(context)!);
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    // Saat kembali ke halaman utama
+    print('🔁 didPopNext: refresh notif count');
+    context.read<NotificationProvider>().fetchUnreadCount();
+  }
+
+  @override
+  void didPushNext() {
+    // Saat pergi ke halaman lain dari MainScreen
+    print('📤 didPushNext: refresh notif count');
+    context.read<NotificationProvider>().fetchUnreadCount();
   }
 
   Future<void> _loadNavIndex() async {
@@ -189,6 +207,9 @@ class _MainScreenState extends State<MainScreen> {
     setState(() {
       _selectedIndex = index;
     });
+
+    // Tambahan keamanan: refresh notif setiap ganti tab
+    context.read<NotificationProvider>().fetchUnreadCount();
   }
 
   @override

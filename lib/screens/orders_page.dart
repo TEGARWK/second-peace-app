@@ -113,23 +113,6 @@ class _OrdersPageState extends State<OrdersPage>
     }
   }
 
-  Future<void> _updateOrderStatus(
-    String orderId,
-    String newStatus,
-    String resi,
-  ) async {
-    try {
-      await _orderService.updateOrderStatus(
-        orderId: orderId,
-        status: newStatus,
-        resi: resi,
-      );
-      await _loadUserOrders();
-    } catch (e) {
-      print('❌ Gagal update status: $e');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(

@@ -85,7 +85,10 @@ class ChatService {
 
     final request =
         http.MultipartRequest('POST', url)
-          ..headers['Authorization'] = 'Bearer $token'
+          ..headers.addAll({
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          })
           ..files.add(
             await http.MultipartFile.fromPath(
               'file',

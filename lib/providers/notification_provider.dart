@@ -7,9 +7,13 @@ class NotificationProvider with ChangeNotifier {
   Future<void> fetchUnreadCount() async {
     try {
       final data = await NotificationService().fetchNotifications();
-      unreadCount = data.where((n) => (n['is_read'] ?? 0) == 0).length;
+      final count = data.where((n) => (n['is_read'] ?? 0) == 0).length;
+      print('📦 Jumlah notifikasi belum dibaca: $count');
+      unreadCount = count;
       notifyListeners();
-    } catch (_) {}
+    } catch (e) {
+      print('❌ Gagal fetchUnreadCount: $e');
+    }
   }
 
   void markAllAsRead() {

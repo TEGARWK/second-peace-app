@@ -42,7 +42,7 @@ dependencies:
   url_launcher: ^6.2.4
   animate_do: ^3.0.2
   google_sign_in: ^6.1.4
-  image_picker: ^1.0.4
+  image_picker: ^0.8.7
   permission_handler: ^11.0.1
   webview_flutter: ^4.2.2
   webview_flutter_android: ^3.10.2
@@ -60,6 +60,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_native_splash: ^2.3.10
+  flutter_launcher_icons: ^0.13.1
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -78,6 +79,11 @@ flutter_native_splash:
   android: true
   ios: true
   fullscreen: true
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/logo.png"
 
 flutter:
   uses-material-design: true
