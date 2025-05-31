@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:secondpeacem/main.dart';
 import 'package:secondpeacem/services/auth_service.dart';
 import 'package:provider/provider.dart';
@@ -24,8 +23,6 @@ class _RegisterPageState extends State<RegisterPage> {
   bool isConfirmVisible = false;
   bool _isLoading = false;
   String? errorMessage;
-
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   Future<void> _register() async {
     setState(() {
@@ -110,27 +107,6 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() {
       _isLoading = false;
     });
-  }
-
-  Future<void> _loginWithGoogle() async {
-    try {
-      final account = await _googleSignIn.signIn();
-      if (account != null) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('isLoggedIn', true);
-        await prefs.setString('userName', account.displayName ?? 'Guest');
-        await prefs.setString('userEmail', account.email);
-
-        if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const MainScreen()),
-            (route) => false,
-          );
-        }
-      }
-    } catch (error) {
-      debugPrint("Google sign in error: $error");
-    }
   }
 
   Widget buildTextField({
@@ -259,18 +235,11 @@ class _RegisterPageState extends State<RegisterPage> {
                 ],
               ),
               const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: _loginWithGoogle,
-                icon: Image.asset("assets/google.png", height: 24),
-                label: const Text("Continue With Google"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF0F0F0),
-                  foregroundColor: Colors.black,
-                  minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
+              const Center(
+                child: Text(
+                  "By continuing, you agree to our Terms of Service and Privacy Policy.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ),
             ],

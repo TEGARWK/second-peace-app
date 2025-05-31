@@ -225,33 +225,14 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               const SizedBox(height: 40),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    // TODO: Google login
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey[200],
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Image.asset('assets/google.png', height: 24),
-                      const SizedBox(width: 12),
-                      const Text(
-                        'Continue With Google',
-                        style: TextStyle(color: Colors.black),
-                      ),
-                    ],
-                  ),
+              Center(
+                child: Text(
+                  "By continuing, you agree to our Terms of Service and Privacy Policy.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
                 ),
               ),
+
               const SizedBox(height: 16),
             ],
           ),
