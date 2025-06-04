@@ -178,11 +178,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Widget _buildAddressBox() {
-    final name = selectedAddress?['nama'] ?? '-';
-    final phone = selectedAddress?['no_whatsapp'] ?? '-';
-    final address = selectedAddress?['alamat'] ?? '-';
-    final city = selectedAddress?['kota_nama'] ?? '-';
-    final province = selectedAddress?['provinsi_nama'] ?? '-';
+    final name = (selectedAddress?['nama'] ?? '-').toString();
+    final phone = (selectedAddress?['no_whatsapp'] ?? '-').toString();
+    final address = (selectedAddress?['alamat'] ?? '-').toString();
+    final city = (selectedAddress?['kota_nama'] ?? '-').toString();
+    final province = (selectedAddress?['provinsi_nama'] ?? '-').toString();
+
+    print("Selected Address: ${selectedAddress.toString()}");
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),

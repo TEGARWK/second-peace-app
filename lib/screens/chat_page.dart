@@ -11,7 +11,8 @@ class ChatPage extends StatefulWidget {
   State<ChatPage> createState() => _ChatPageState();
 }
 
-const String baseUrl = 'http://10.0.2.2:8000'; // untuk development
+//const String baseUrl = 'http://10.0.2.2:8000'; // untuk development
+const String baseUrl = 'https://secondpeace.my.id'; // untuk production
 
 class _ChatPageState extends State<ChatPage> {
   final TextEditingController _controller = TextEditingController();
@@ -94,15 +95,15 @@ class _ChatPageState extends State<ChatPage> {
     final time = DateFormat(
       'HH:mm',
     ).format(DateTime.tryParse(msg['created_at'] ?? '') ?? DateTime.now());
-    final hasMedia = msg['media_path'] != null;
-    final isImage =
-        (msg['media_type'] ?? '').toString().trim().toLowerCase() == 'image';
-    //final mediaUrl =
-    //hasMedia
-    //? 'https://secondpeace.my.id/storage/${msg['media_path']}'
-    //: null;
 
-    final mediaUrl = hasMedia ? '$baseUrl/storage/${msg['media_path']}' : null;
+    final hasMedia = msg['media_path'] != null;
+    final mediaPath = msg['media_path'] ?? '';
+
+    // **Perbaikan: Pastikan media_url dibentuk dengan benar**
+    final mediaUrl =
+        hasMedia && mediaPath.isNotEmpty
+            ? 'https://secondpeace.my.id/chat_media/chat_media/$mediaPath' // Ganti path sesuai folder yang benar
+            : null;
 
     final bubbleColor = isMe ? const Color(0xFFDCF8C6) : Colors.white;
     final textColor = isMe ? Colors.black87 : Colors.black;
@@ -114,18 +115,19 @@ class _ChatPageState extends State<ChatPage> {
       bottomRight: isMe ? Radius.zero : const Radius.circular(12),
     );
 
+    // **Perbaikan: Pastikan mediaUrl tidak kosong sebelum ditampilkan**
     Widget content =
         hasMedia
-            ? isImage
+            ? mediaUrl != null && mediaUrl.isNotEmpty
                 ? Image.network(
-                  mediaUrl!,
+                  mediaUrl,
                   width: 180,
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) {
                     return const Text('🛑 Gagal memuat gambar');
                   },
                 )
-                : const Text('[Video tidak ditampilkan]')
+                : const Text('Gambar tidak tersedia')
             : Text(
               msg['message'] ?? '',
               style: TextStyle(color: textColor, fontSize: 15),

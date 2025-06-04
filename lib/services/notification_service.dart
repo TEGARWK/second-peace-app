@@ -4,7 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationService {
   final String baseUrl =
-      'http://10.0.2.2:8000/api/v1'; // ganti kalau pakai hosting
+      'https://secondpeace.my.id/api/v1'; // ganti kalau pakai hosting
+  //'http://10.0.2.2:8000/api/v1'; // ganti kalau pakai hosting
 
   Future<List<Map<String, dynamic>>> fetchNotifications() async {
     final prefs = await SharedPreferences.getInstance();

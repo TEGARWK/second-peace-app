@@ -28,7 +28,9 @@ class _OrderDetailShippedPageState extends State<OrderDetailShippedPage> {
     final token = prefs.getString('token');
 
     final response = await http.get(
-      Uri.parse('http://10.0.2.2:8000/api/v1/pesanan/${widget.idPesanan}'),
+      Uri.parse('https://secondpeace.my.id/api/v1/pesanan/${widget.idPesanan}'),
+      // Ganti dengan URL API yang sesuai
+      //Uri.parse('http://10.0.2.2:8000/api/v1/pesanan/${widget.idPesanan}'),
       headers: {'Authorization': 'Bearer $token', 'Accept': 'application/json'},
     );
 
@@ -75,9 +77,11 @@ class _OrderDetailShippedPageState extends State<OrderDetailShippedPage> {
     final token = prefs.getString('token');
 
     final response = await http.patch(
+      // Ganti dengan URL API yang sesuai
       Uri.parse(
-        'http://10.0.2.2:8000/api/v1/pesanan/${widget.idPesanan}/mark-received',
+        'https://secondpeace.my.id/api/v1/pesanan/${widget.idPesanan}/mark-received',
       ),
+      //Uri.parse('http://10.0.2.2:8000/api/v1/pesanan/${widget.idPesanan}/mark-received',),
       headers: {'Authorization': 'Bearer $token', 'Accept': 'application/json'},
     );
 

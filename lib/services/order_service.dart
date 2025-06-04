@@ -4,7 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class OrderService {
   // ✅ Gunakan URL lokal untuk pengembangan
-  final String baseUrl = 'http://10.0.2.2:8000/api/v1';
+  final String baseUrl = 'https://secondpeace.my.id/api/v1';
+  //final String baseUrl = 'http://10.0.2.2:8000/api/v1';
 
   // 🔐 Ambil token dari SharedPreferences
   Future<String?> _getToken() async {

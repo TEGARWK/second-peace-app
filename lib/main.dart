@@ -51,8 +51,8 @@ class MyApp extends StatelessWidget {
         final isLoggedIn = token.isNotEmpty;
 
         final cartService = CartService(
-          //baseUrl: 'https://secondpeace.my.id/api/v1',
-          baseUrl: 'http://10.0.2.2:8000/api/v1',
+          baseUrl: 'https://secondpeace.my.id/api/v1',
+          //baseUrl: 'http://10.0.2.2:8000/api/v1',
           token: token,
         );
 

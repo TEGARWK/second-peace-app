@@ -22,6 +22,7 @@ class _DaftarAlamatPageState extends State<DaftarAlamatPage> {
     try {
       final addresses = await AuthService().getAddresses();
       print('DATA API: $addresses');
+
       setState(() {
         alamatUser = addresses;
       });
@@ -36,22 +37,71 @@ class _DaftarAlamatPageState extends State<DaftarAlamatPage> {
   Future<void> _setAsPrimary(int id) async {
     try {
       final result = await AuthService().setPrimaryAddress(id);
-      if (result['success'] == true) {
-        final updatedAddresses = await AuthService().getAddresses();
-        final newPrimary = updatedAddresses.firstWhere((a) => a['utama'] == 1);
+      print('Result set primary: $result');
 
-        Navigator.pop(context, newPrimary);
+      if (result['success'] == true) {
+        final addresses = await AuthService().getAddresses();
+
+        // Update state
+        setState(() {
+          alamatUser = addresses;
+        });
+
+        // Cari alamat utama yang baru
+        final newPrimary = addresses.firstWhere(
+          (alamat) =>
+              alamat['utama'] == 1 ||
+              alamat['utama'] == '1' ||
+              alamat['utama'] == true,
+          orElse: () => {},
+        );
+
+        print("Alamat utama baru: $newPrimary");
+
+        // Simpan atau kirim balik ke halaman sebelumnya
+        Navigator.pop(
+          context,
+          newPrimary,
+        ); // <-- ini agar halaman sebelumnya (checkout) bisa pakai alamat ini
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Alamat utama berhasil diperbarui")),
+        );
       }
     } catch (e) {
       print("Gagal set utama: $e");
     }
   }
 
-  Future<void> _hapusAlamat(int id) async {
+  Future<void> _hapusAlamat(int id, bool isPrimary) async {
+    if (isPrimary) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder:
+            (_) => AlertDialog(
+              title: const Text('Konfirmasi'),
+              content: const Text(
+                'Alamat ini adalah alamat utama. Yakin ingin menghapus?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Batal'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Hapus'),
+                ),
+              ],
+            ),
+      );
+      if (confirm != true) return;
+    }
+
     try {
       final result = await AuthService().deleteAddress(id);
       if (result['success'] == true) {
-        _loadAlamatUser();
+        await _loadAlamatUser();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Alamat berhasil dihapus")),
         );
@@ -69,7 +119,7 @@ class _DaftarAlamatPageState extends State<DaftarAlamatPage> {
       ),
     );
     if (result == true) {
-      _loadAlamatUser();
+      await _loadAlamatUser();
     }
   }
 
@@ -87,139 +137,136 @@ class _DaftarAlamatPageState extends State<DaftarAlamatPage> {
       body:
           alamatUser.isEmpty
               ? const Center(child: Text("Belum ada alamat."))
-              : ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: alamatUser.length,
-                itemBuilder: (context, index) {
-                  final alamat = alamatUser[index];
-                  final isPrimary = alamat['utama'] == 1;
-
-                  return Card(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+              : Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
                     ),
-                    margin: const EdgeInsets.only(bottom: 16),
-                    elevation: 4,
-                    child: Padding(
+                  ),
+                  Expanded(
+                    child: ListView.builder(
                       padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  Text(
-                                    alamat['nama'] ?? '',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  if (isPrimary)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.green.shade100,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: const Text(
-                                        'Utama',
-                                        style: TextStyle(
-                                          color: Colors.green,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              if (isPrimary)
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.pop(context, alamat);
-                                  },
-                                  child: const Text(
-                                    'Gunakan',
-                                    style: TextStyle(color: Colors.black),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(alamat['alamat'] ?? ''),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Kota: ${alamat['kota_nama'] ?? '-'}',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey,
-                            ),
-                          ),
-                          Text(
-                            'Provinsi: ${alamat['provinsi_nama'] ?? '-'}',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey,
-                            ),
-                          ),
+                      itemCount: alamatUser.length,
+                      itemBuilder: (context, index) {
+                        final alamat = alamatUser[index];
+                        final isPrimary =
+                            alamat['utama'] == 1 ||
+                            alamat['utama'] == '1' ||
+                            alamat['utama'] == true;
 
-                          const Divider(height: 20),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                alamat['no_whatsapp'] ?? '',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                              Row(
-                                children: [
-                                  if (!isPrimary)
-                                    TextButton(
-                                      onPressed:
-                                          () => _setAsPrimary(
-                                            alamat['id_alamat'],
-                                          ),
-                                      child: const Text(
-                                        'Set Utama',
-                                        style: TextStyle(color: Colors.green),
+                        return Card(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          margin: const EdgeInsets.only(bottom: 16),
+                          elevation: 4,
+                          child: Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      alamat['nama'] ?? 'Tanpa Nama',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                  TextButton(
-                                    onPressed:
-                                        () => _bukaFormAlamat(
-                                          existingData: alamat,
+                                    Row(
+                                      children: [
+                                        if (!isPrimary && alamatUser.length > 1)
+                                          TextButton(
+                                            onPressed:
+                                                () => _setAsPrimary(
+                                                  alamat['id_alamat'],
+                                                ),
+                                            child: const Text(
+                                              'Gunakan',
+                                              style: TextStyle(
+                                                color: Colors.green,
+                                              ),
+                                            ),
+                                          )
+                                        else
+                                          const Padding(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 2,
+                                            ),
+                                            child: Text(
+                                              'Digunakan',
+                                              style: TextStyle(
+                                                color: Colors.green,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        TextButton(
+                                          onPressed:
+                                              () => _bukaFormAlamat(
+                                                existingData: alamat,
+                                              ),
+                                          child: const Text(
+                                            'Edit',
+                                            style: TextStyle(
+                                              color: Colors.blue,
+                                            ),
+                                          ),
                                         ),
-                                    child: const Text(
-                                      'Edit',
-                                      style: TextStyle(color: Colors.blue),
+                                        TextButton(
+                                          onPressed:
+                                              () => _hapusAlamat(
+                                                alamat['id_alamat'],
+                                                isPrimary,
+                                              ),
+                                          child: const Text(
+                                            'Hapus',
+                                            style: TextStyle(color: Colors.red),
+                                          ),
+                                        ),
+                                      ],
                                     ),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 8),
+                                Text(alamat['alamat'] ?? ''),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Kota: ${alamat['kota_nama'] ?? '-'}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey,
                                   ),
-                                  TextButton(
-                                    onPressed:
-                                        () => _hapusAlamat(alamat['id_alamat']),
-                                    child: const Text(
-                                      'Hapus',
-                                      style: TextStyle(color: Colors.red),
-                                    ),
+                                ),
+                                Text(
+                                  'Provinsi: ${alamat['provinsi_nama'] ?? '-'}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey,
                                   ),
-                                ],
-                              ),
-                            ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  alamat['no_whatsapp'] ?? '',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
-                  );
-                },
+                  ),
+                ],
               ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: Colors.black,

@@ -6,8 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 
 class ChatService {
-  //final String baseUrl = 'https://secondpeace.my.id/api/v1';
-  final String baseUrl = 'http://10.0.2.2:8000/api/v1';
+  final String baseUrl = 'https://secondpeace.my.id/api/v1';
+  //final String baseUrl = 'http://10.0.2.2:8000/api/v1';
 
   Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -75,7 +75,7 @@ class ChatService {
   }
 
   /// 📷 Upload gambar/video ke chat room
-  Future<void> uploadMedia(XFile file, int roomId) async {
+  Future<String> uploadMedia(XFile file, int roomId) async {
     final token = await _getToken();
     final url = Uri.parse('$baseUrl/chat-rooms/$roomId/upload');
 
@@ -100,7 +100,16 @@ class ChatService {
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
 
-    if (response.statusCode != 200 && response.statusCode != 201) {
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final data = jsonDecode(response.body);
+      final mediaPath = data['media_path']; // Contoh: "chat_media/filename.jpg"
+      final mediaUrl =
+          'https://secondpeace.my.id/chat_media/$mediaPath'; // Benar tanpa duplikat
+
+      print("Uploaded media URL: $mediaUrl");
+
+      return mediaUrl; // Kembalikan mediaUrl
+    } else {
       throw Exception('Gagal upload media: ${response.body}');
     }
   }

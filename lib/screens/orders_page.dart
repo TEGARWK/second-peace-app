@@ -205,7 +205,7 @@ class _OrdersPageState extends State<OrdersPage>
             return sum + (qty is int ? qty : int.tryParse(qty.toString()) ?? 0);
           });
 
-          final grandTotal = order['total_harga'] ?? 0;
+          final grandTotal = int.tryParse(order['total_harga'].toString()) ?? 0;
 
           final formattedDate = order['tanggal'] ?? '-';
 

@@ -1,9 +1,17 @@
 // Revisi: order_detail_unpaid_page.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+
+String _formatDateTime(String rawDateTime) {
+  try {
+    final dt = DateTime.parse(rawDateTime);
+    return DateFormat('dd MMM yyyy HH:mm', 'id_ID').format(dt);
+  } catch (_) {
+    return rawDateTime;
+  }
+}
 
 class OrderDetailUnpaidPage extends StatelessWidget {
   final Map<String, dynamic> order;
@@ -143,7 +151,7 @@ class OrderDetailUnpaidPage extends StatelessWidget {
               ],
             ),
           ),
-          _buildBottomBar(total, context),
+          _buildBottomBar(total, context, order),
         ],
       ),
     );
@@ -177,7 +185,8 @@ class OrderDetailUnpaidPage extends StatelessWidget {
             const Icon(Icons.timer_outlined, color: Colors.red),
             const SizedBox(width: 8),
             Text(
-              "Batas bayar: ${formatDateTime(expiredAt)}",
+              "Batas bayar: ${_formatDateTime(expiredAt)}",
+
               style: const TextStyle(fontSize: 13, color: Colors.red),
             ),
           ],
@@ -300,7 +309,7 @@ class OrderDetailUnpaidPage extends StatelessWidget {
               children: [
                 const Icon(Icons.location_on_outlined),
                 const SizedBox(width: 8),
-                Flexible(child: Text("Alamat: $alamat")),
+                Flexible(child: Flexible(child: Text("Alamat: $alamat"))),
               ],
             ),
             const SizedBox(height: 6),
@@ -381,7 +390,11 @@ class OrderDetailUnpaidPage extends StatelessWidget {
     ),
   );
 
-  Widget _buildBottomBar(double total, BuildContext context) {
+  Widget _buildBottomBar(
+    double total,
+    BuildContext context,
+    Map<String, dynamic> order,
+  ) {
     final snapToken = order['snap_token'];
     final orderId = order['id_pembayaran'];
     final int idPesanan = order['id_pesanan'] ?? 0;
